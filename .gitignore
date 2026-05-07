@@ -1,0 +1,14 @@
+# Env
+.env
+.env.local
+
+# Node
+node_modules
+
+# Logs
+*.log
+
+# TS
+*.tsbuildinfo
+dist
+.vscode

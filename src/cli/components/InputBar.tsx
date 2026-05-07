@@ -1,0 +1,110 @@
+// src/cli/components/InputBar.tsx
+
+import React, { useState, useEffect } from "react";
+
+import { Box, Text, useInput } from "ink";
+
+import TextInput from "ink-text-input";
+
+import { useAutocomplete } from "../hooks/useAutoComplete.js";
+
+import { CommandPopup } from "./CommandPopUp.js";
+
+interface Props {
+  value: string;
+
+  onChange: (v: string) => void;
+
+  onSubmit: (v: string) => void;
+
+  loading: boolean;
+}
+
+export function InputBar({ value, onChange, onSubmit, loading }: Props) {
+  const suggestions = useAutocomplete(value);
+
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  /**
+   * Reset selection when input changes
+   */
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [value]);
+
+  /**
+   * Keyboard controls
+   */
+
+  useInput((input, key) => {
+    if (loading || suggestions.length === 0) {
+      return;
+    }
+
+    /**
+     * DOWN
+     */
+
+    if (key.downArrow) {
+      setSelectedIndex((prev) =>
+        prev + 1 >= suggestions.length ? 0 : prev + 1,
+      );
+    }
+
+    /**
+     * UP
+     */
+
+    if (key.upArrow) {
+      setSelectedIndex((prev) =>
+        prev - 1 < 0 ? suggestions.length - 1 : prev - 1,
+      );
+    }
+
+    /**
+     * TAB autocomplete
+     */
+
+    if (key.tab) {
+      const selected = suggestions[selectedIndex];
+
+      if (selected) {
+        onChange(selected.command);
+      }
+    }
+
+    /**
+     * RIGHT arrow autocomplete
+     */
+
+    if (key.rightArrow) {
+      const selected = suggestions[selectedIndex];
+
+      if (selected) {
+        onChange(selected.command);
+      }
+    }
+  });
+
+  return (
+    <Box
+      flexDirection='column'
+      borderStyle='single'
+      borderColor={loading ? "gray" : "green"}
+      paddingX={1}
+    >
+      <CommandPopup suggestions={suggestions} selectedIndex={selectedIndex} />
+      <Box>
+        <Text color='green'>› </Text>
+
+        <TextInput
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          placeholder={loading ? "Waiting..." : "Ask CAKE anything..."}
+        />
+      </Box>
+    </Box>
+  );
+}
