@@ -8,6 +8,7 @@ import { intentMap } from "./intentMap.js";
 import { SYSTEM_PROMPT } from "../config/constants.js";
 import { initCronManager } from "./handlers/cron.js";
 import { ResponseCache } from "./responseCache.js";
+import { getFastModel } from "../providers/utils.js";
 
 export interface AgentResponse {
   text: string;
@@ -19,6 +20,7 @@ export class CakeAgent {
   private history: ConversationHistory;
   private memory: MemoryManager;
   private model: string | undefined;
+  private fastModel: string | undefined;
   private responseCache: ResponseCache;
 
   constructor(provider: AIProvider, model?: string) {
@@ -26,6 +28,7 @@ export class CakeAgent {
     this.history = new ConversationHistory();
     this.memory = new MemoryManager(provider);
     this.model = model;
+    this.fastModel = getFastModel(this.provider.name);
     this.responseCache = new ResponseCache(200, 60_000); //200 entry
 
     // Initialize Cron - execute jobs through agent.run()
@@ -50,16 +53,8 @@ export class CakeAgent {
       return cached;
     }
 
-    // 1. Retrieve relevant context from memory
-    const relevantContext = await this.memory.retrieve(input);
-    const contextString =
-      relevantContext.length > 0
-        ? "\n\nRelevant context from past interactions:\n" +
-          relevantContext.map((c) => `- ${c}`).join("\n")
-        : "";
-
+    // 1) Fast regex path first (no AI call)
     const regexHandler = matchRoute(input);
-    const aiIntentPromise = aiIntentRouter(this.provider, input, this.model);
 
     if (regexHandler) {
       const result = await regexHandler(this.provider, input, this.model);
@@ -77,17 +72,30 @@ export class CakeAgent {
       return response;
     }
 
+    // 2) AI intent router (fast model) only when regex did not match
+    const aiIntentPromise = aiIntentRouter(
+      this.provider,
+      input,
+      this.fastModel,
+    );
     const intent = await aiIntentPromise;
     const aiHandler = intentMap[intent];
 
     if (aiHandler) {
-      const result = await aiHandler(this.provider, input, this.model);
+      const result = await aiHandler(this.provider, input, this.fastModel);
       const response = { text: result.text, usage: result.usage };
       this.responseCache.set(cacheKey, response);
       return response;
     }
 
-    // Fallback: general conversation with history + RAG context
+    // 3) Fallback: general conversation with history + RAG context
+    const relevantContext = await this.memory.retrieve(input);
+    const contextString =
+      relevantContext.length > 0
+        ? "\n\nRelevant context from past interactions:\n" +
+          relevantContext.map((c) => `- ${c}`).join("\n")
+        : "";
+
     this.history.push("user", input);
 
     const result = await this.provider.chat(this.history.getAll(), {
