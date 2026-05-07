@@ -49,17 +49,8 @@ export class CakeAgent {
     if (cached) {
       return cached;
     }
-
-    // 1. Retrieve relevant context from memory
-    const relevantContext = await this.memory.retrieve(input);
-    const contextString =
-      relevantContext.length > 0
-        ? "\n\nRelevant context from past interactions:\n" +
-          relevantContext.map((c) => `- ${c}`).join("\n")
-        : "";
-
+    // 1) Fast regex path first (no AI call)
     const regexHandler = matchRoute(input);
-    const aiIntentPromise = aiIntentRouter(this.provider, input, this.model);
 
     if (regexHandler) {
       const result = await regexHandler(this.provider, input, this.model);
@@ -77,6 +68,8 @@ export class CakeAgent {
       return response;
     }
 
+    // 2) AI intent router (fast model) only when regex did not match
+    const aiIntentPromise = aiIntentRouter(this.provider, input, this.model);
     const intent = await aiIntentPromise;
     const aiHandler = intentMap[intent];
 
@@ -87,7 +80,14 @@ export class CakeAgent {
       return response;
     }
 
-    // Fallback: general conversation with history + RAG context
+    // 3) Fallback: general conversation with history + RAG context
+    const relevantContext = await this.memory.retrieve(input);
+    const contextString =
+      relevantContext.length > 0
+        ? "\n\nRelevant context from past interactions:\n" +
+          relevantContext.map((c) => `- ${c}`).join("\n")
+        : "";
+
     this.history.push("user", input);
 
     const result = await this.provider.chat(this.history.getAll(), {
