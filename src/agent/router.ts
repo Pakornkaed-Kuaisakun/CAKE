@@ -163,6 +163,12 @@ export const ROUTES: Route[] = [
     patterns: [/\b(finance|financial|stock|market)\b/i],
     handler: H.handleFinanceReport,
   },
+
+  // Weather
+  {
+    patterns: [/\b(weather)\b/i],
+    handler: H.handleWeather,
+  },
 ];
 
 /**

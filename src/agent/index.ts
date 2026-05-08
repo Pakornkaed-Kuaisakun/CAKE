@@ -29,7 +29,7 @@ export class CakeAgent {
     this.memory = new MemoryManager(provider);
     this.model = model;
     this.fastModel = getFastModel(this.provider.name);
-    this.responseCache = new ResponseCache(200, 60_000); //200 entry
+    this.responseCache = new ResponseCache(100, 60_000); //100 entry
 
     // Initialize Cron - execute jobs through agent.run()
     initCronManager(async (job) => {

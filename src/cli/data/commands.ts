@@ -159,6 +159,11 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Performance check",
   },
 
+  {
+    command: "weather",
+    description: "Get weather report (from IP geolacation)",
+  },
+
   //   {
   //     command: "email <to> <subject> <body_path>",
 

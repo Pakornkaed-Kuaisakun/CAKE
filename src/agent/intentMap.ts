@@ -33,4 +33,5 @@ export const intentMap: Record<string, Handler> = {
   notify: H.handleNotify,
   test_notify: H.handleTestNotify,
   finance: H.handleFinanceReport,
+  weather: H.handleWeather,
 };

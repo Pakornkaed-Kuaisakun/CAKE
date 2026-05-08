@@ -10,3 +10,4 @@ export * from "./memory.js";
 export * from "./cron.js";
 export * from "./notify.js";
 export * from "./finance.js";
+export * from "./weather.js";
