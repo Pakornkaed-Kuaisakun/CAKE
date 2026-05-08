@@ -1,10 +1,21 @@
 import { GeoResult, WeatherResponse } from "./types.js";
 import { weatherCodeMap, weatherLabel } from "./weatherCode.js";
 import { detectLocationFromIP } from "./location.js";
-import { loadWeatherCache, saveWeatherCache } from "./cache.js";
+import {
+  loadWeatherCache,
+  saveWeatherCache,
+  loadLocationCache,
+  saveLocationCache,
+} from "./cache.js";
 
 export async function getWeatherReport(): Promise<string> {
-  const geo = await detectLocationFromIP();
+  let geo = loadLocationCache();
+
+  if (!geo) {
+    geo = await detectLocationFromIP();
+
+    saveLocationCache(geo);
+  }
 
   const params = new URLSearchParams({
     latitude: String(geo.latitude),
