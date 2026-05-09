@@ -40,6 +40,7 @@ const HELP = `
 SLASH COMMANDS:
   /help                    Show this help message
   /clear                   Reset conversation & clear screen
+  /reboost                 Re-initialize agent & clear session
   /exit                    Quit CAKE
 
 CONFIGURATION:
@@ -191,6 +192,28 @@ export function useAgent() {
             ]);
             agent.clearHistory();
             return;
+
+          // ── reboost ───────────────────────────────────────
+          case "reboost": {
+            setLoading(true);
+            try {
+              const newAgent = buildAgent(providerName, model);
+              setAgent(newAgent);
+              setMsgVersion((v) => v + 1);
+              setMessages([
+                {
+                  id: makeId(),
+                  role: "system",
+                  content: "🚀 System reboosted. Agent re-initialized.",
+                },
+              ]);
+            } catch (err: any) {
+              addMsg("system", `Reboost failed: ${err.message}`);
+            } finally {
+              setLoading(false);
+            }
+            return;
+          }
 
           // ── provider ──────────────────────────────────────
           case "provider": {

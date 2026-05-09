@@ -14,7 +14,8 @@ export async function aiIntentRouter(
 
     Classify the user input into ONE of these intents:
     - chat (General conversation, greetings, AI's capabilities, general knowledge)
-    - email
+    - email (Fetching/summarizing emails)
+    - email_send (Sending a new email)
     - news
     - calendar_list
     - calendar_create

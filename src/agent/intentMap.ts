@@ -10,6 +10,7 @@ export type Handler = (
 
 export const intentMap: Record<string, Handler> = {
   email: H.handleEmail,
+  email_send: H.handleSendEmail,
   news: H.handleNews,
   calendar_list: H.handleCalendarList,
   calendar_create: H.handleCalendarCreate,

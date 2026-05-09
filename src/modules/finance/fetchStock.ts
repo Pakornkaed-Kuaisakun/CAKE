@@ -1,4 +1,5 @@
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
+const yahooFinance = new YahooFinance();
 import type { StockData } from "./types.js";
 
 export async function fetchStockData(symbol: string): Promise<StockData> {

@@ -15,11 +15,12 @@ interface Route {
 
 export const ROUTES: Route[] = [
   // Email
-  { patterns: [/\b(my emails|inbox|mail)\b/], handler: H.handleEmail },
+  { patterns: [/\b(my emails|inbox|mail)\b/, /^email$/], handler: H.handleEmail },
+  { patterns: [/\b(send email|write email|compose email)\b/, /^email_send\b/], handler: H.handleSendEmail },
 
   // News
   {
-    patterns: [/\b(news|headlines|today'?s news)\b/],
+    patterns: [/\b(news|headlines|today'?s news)\b/, /^news$/],
     handler: H.handleNews,
   },
 
@@ -33,13 +34,19 @@ export const ROUTES: Route[] = [
 
   // Calendar — list
   {
-    patterns: [/\b(calendar_list|schedule_list|upcoming_list|events?)\b/],
+    patterns: [/\b(calendar_list|schedule_list|upcoming_list|events?)\b/, /^calendar_list$/],
     handler: H.handleCalendarList,
+  },
+
+  // Calendar - remove
+  {
+    patterns: [/^calendar_remove\b/],
+    handler: H.handleCalendarRemove,
   },
 
   // Todos — add
   {
-    patterns: [/\b(add|create|new)\b.*\b(todo|task)\b/],
+    patterns: [/\b(add|create|new)\b.*\b(todo|task)\b/, /^todo_add\b/],
     handler: H.handleTodoAdd,
   },
 
@@ -48,6 +55,7 @@ export const ROUTES: Route[] = [
     patterns: [
       /\b(todo|task)s?\b.*\b(show|view|list|my)\b/,
       /\b(show|view|list)\b.*\b(todo|task)s?\b/,
+      /^todo_list$/,
     ],
     handler: H.handleTodoList,
   },
@@ -78,7 +86,7 @@ export const ROUTES: Route[] = [
 
   // File — list
   {
-    patterns: [/^ls\s/, /\b(list|dir)\b.*\b(file|folder|directory)\b/],
+    patterns: [/^ls\b/, /\b(list|dir)\b.*\b(file|folder|directory)\b/, /^file_list\b/],
     handler: H.handleFileList,
   },
 
@@ -107,7 +115,7 @@ export const ROUTES: Route[] = [
 
   // File — compose
   {
-    patterns: [/\b(compose|create|write)\b\s+file\s+\S+/],
+    patterns: [/\b(compose|create|write)\b\s+file\s+\S+/, /^file_compose\b/],
     handler: H.handleFileCompose,
   },
 

@@ -93,6 +93,7 @@ export class CakeAgent {
       const lowerInput = input.toLowerCase();
       const isLive = [
         "email",
+        "email_send",
         "news",
         "weather",
         "calendar",

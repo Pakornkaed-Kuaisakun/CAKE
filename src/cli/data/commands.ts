@@ -9,6 +9,10 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "email",
     description: "Read and summarize emails from inbox (top 5)",
   },
+  {
+    command: "email_send to <email> subject <subject> [body <body>] [attach <path>]",
+    description: "Send a new email with optional attachment",
+  },
   { command: "news", description: "Fetch top 5 news from each RSS feed" },
   { command: "calendar_list", description: "List upcoming events" },
   {
@@ -126,6 +130,7 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/help", description: "Show this help message" },
   { command: "/exit", description: "Exit the CLI" },
   { command: "/clear", description: "Clear the screen" },
+  { command: "/reboost", description: "Re-initialize the agent and clear session" },
   {
     command: "/provider <name>",
     description:
