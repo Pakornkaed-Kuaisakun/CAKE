@@ -8,6 +8,10 @@ export async function readPDF(filePath: string): Promise<string> {
 
     const pdf = await pdfjsLib.getDocument({
       data,
+      // Suppress worker warnings in Node environment
+      useWorkerFetch: false,
+      useSystemFonts: true,
+      // isImageDecoderSupported: false,
     }).promise;
 
     let text = "";

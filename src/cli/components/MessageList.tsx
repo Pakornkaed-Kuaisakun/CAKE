@@ -33,7 +33,7 @@ function wrapText(text: string, width = 72): string {
         }
       }
       if (current) wrapped.push(current);
-      return wrapped.join("\n  "); // indent continuation lines
+      return wrapped.join("\n  ");
     })
     .join("\n");
 }
@@ -65,12 +65,13 @@ function AssistantMessage({
   return (
     <Box flexDirection='column' marginBottom={1}>
       <Text color='cyan' bold>
-        CAKE{" "}
-        {thinkingTime !== undefined ? `(${formatTime(thinkingTime)}) ` : ""}›
+        {"CAKE "}
+        {thinkingTime !== undefined ? `(${formatTime(thinkingTime)}) ` : ""}
+        {"›"}
       </Text>
       <Box paddingLeft={2} flexDirection='column'>
         {wrapped.split("\n").map((line, i) => (
-          <Text key={`${i}`} wrap='wrap'>
+          <Text key={i} wrap='wrap'>
             {line}
           </Text>
         ))}
@@ -80,7 +81,6 @@ function AssistantMessage({
 }
 
 function SystemMessage({ content }: { content: string }) {
-  const lines = content.split("\n");
   const urlRegex = /(https?:\/\/[^\s]+)/g;
 
   return (
@@ -91,17 +91,21 @@ function SystemMessage({ content }: { content: string }) {
       paddingX={1}
       flexDirection='column'
     >
-      {lines.map((line, i) => {
+      {content.split("\n").map((line, i) => {
         const parts = line.split(urlRegex);
         return (
           <Text key={i} color='yellow'>
-            {parts.map((part, j) => {
-              if (part.match(urlRegex)) {
-                // ANSI OSC 8 Hyperlink escape sequence
-                return `\u001b]8;;${part}\u001b\\${part}\u001b]8;;\u001b\\`;
-              }
-              return part;
-            })}
+            {parts.map((part, j) =>
+              // Render URLs in a brighter color so they stand out, but stay as plain text
+              // (Ink does not support clickable hyperlinks natively)
+              urlRegex.test(part) ? (
+                <Text key={j} color='cyanBright'>
+                  {part}
+                </Text>
+              ) : (
+                part
+              ),
+            )}
           </Text>
         );
       })}
@@ -111,7 +115,6 @@ function SystemMessage({ content }: { content: string }) {
 
 export function MessageList({ messages, version }: Props) {
   return (
-    // key forces a full remount when /clear is called
     <Box key={version} flexDirection='column'>
       {messages.map((msg) => {
         if (msg.role === "user")
@@ -124,7 +127,6 @@ export function MessageList({ messages, version }: Props) {
               thinkingTime={msg.thinkingTime}
             />
           );
-
         return <SystemMessage key={msg.id} content={msg.content} />;
       })}
     </Box>

@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { AIProvider, Message, ChatOptions, ChatResult } from "./types.js";
 
 // Pricing per million tokens (as of 2025)
-const PRICE_INPUT = 3.0 / 1_000_000;   // claude-opus-4-5
+const PRICE_INPUT = 3.0 / 1_000_000; // claude-opus-4-5
 const PRICE_OUTPUT = 15.0 / 1_000_000;
 
 export class ClaudeProvider implements AIProvider {
@@ -15,9 +15,12 @@ export class ClaudeProvider implements AIProvider {
     });
   }
 
-  async chat(messages: Message[], options: ChatOptions = {}): Promise<ChatResult> {
+  async chat(
+    messages: Message[],
+    options: ChatOptions = {},
+  ): Promise<ChatResult> {
     const {
-      model = "claude-opus-4-5",
+      model = "claude-sonnet-4-5",
       systemPrompt,
       maxTokens = 2048,
       temperature = 0.7,

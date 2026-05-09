@@ -1,5 +1,5 @@
-import { GeoResult, WeatherResponse } from "./types.js";
-import { weatherCodeMap, weatherLabel } from "./weatherCode.js";
+import type { WeatherResponse } from "./types.js";
+import { weatherLabel } from "./weatherCode.js";
 import { detectLocationFromIP } from "./location.js";
 import {
   loadWeatherCache,
@@ -13,7 +13,6 @@ export async function getWeatherReport(): Promise<string> {
 
   if (!geo) {
     geo = await detectLocationFromIP();
-
     saveLocationCache(geo);
   }
 
@@ -39,23 +38,27 @@ export async function getWeatherReport(): Promise<string> {
     }
 
     weather = (await weatherRes.json()) as WeatherResponse;
-
     saveWeatherCache(weather);
   }
-  const place = [geo.city, geo.region, geo.country_name];
 
-  const today = `${weather.daily.time[0]}: ${weatherLabel(weather.daily.weather_code[0])}, ${weather.daily.temperature_2m_min[0]}°C to ${weather.daily.temperature_2m_max[0]}°C, Precipitation: ${weather.daily.precipitation_sum[0]}mm, Max P: ${weather.daily.precipitation_probability_max[0]}%`;
+  // Fix: filter undefined parts and join properly
+  const placeParts = [geo.city, geo.region, geo.country_name].filter(Boolean);
+  const place =
+    placeParts.length > 0 ? placeParts.join(", ") : "Unknown location";
 
-  const tomorrow = `${weather.daily.time[1]}: ${weatherLabel(weather.daily.weather_code[1])}, ${weather.daily.temperature_2m_min[1]}°C to ${weather.daily.temperature_2m_max[1]}°C, Precipitation: ${weather.daily.precipitation_sum[1]}mm, Max P: ${weather.daily.precipitation_probability_max[1]}%`;
-
-  const dayAfter = `${weather.daily.time[2]}: ${weatherLabel(weather.daily.weather_code[2])}, ${weather.daily.temperature_2m_min[2]}°C to ${weather.daily.temperature_2m_max[2]}°C, Precipitation: ${weather.daily.precipitation_sum[2]}mm, Max P: ${weather.daily.precipitation_probability_max[2]}%`;
+  const fmtDay = (i: number) =>
+    `${weather!.daily.time[i]}: ${weatherLabel(weather!.daily.weather_code[i])}, ` +
+    `${weather!.daily.temperature_2m_min[i]}°C to ${weather!.daily.temperature_2m_max[i]}°C, ` +
+    `Precipitation: ${weather!.daily.precipitation_sum[i]}mm, ` +
+    `Max P: ${weather!.daily.precipitation_probability_max[i]}%`;
 
   return [
-    `[WEATHER] Location from IP: ${place || "Unknown location"} (${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)})`,
-    `Current: ${weather.current.temperature_2m}°C, ${weatherLabel(weather.current.weather_code)}, wind speed ${weather.current.wind_speed_10m}km/h, humidity ${weather.current.relative_humidity_2m}%`,
+    `[WEATHER] Location from IP: ${place} (${geo.latitude.toFixed(4)}, ${geo.longitude.toFixed(4)})`,
+    `Current: ${weather.current.temperature_2m}°C, ${weatherLabel(weather.current.weather_code)}, ` +
+      `wind speed ${weather.current.wind_speed_10m}km/h, humidity ${weather.current.relative_humidity_2m}%`,
     `Forecast`,
-    `- ${today}`,
-    `- ${tomorrow}`,
-    `- ${dayAfter}`,
+    `- ${fmtDay(0)}`,
+    `- ${fmtDay(1)}`,
+    `- ${fmtDay(2)}`,
   ].join("\n");
 }

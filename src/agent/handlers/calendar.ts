@@ -82,7 +82,7 @@ export async function handleCalendarRemove(
   input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  const match = input.match(/\b[0-9a-f]{24}\b/);
+  const match = input.match(/\b[0-9a-f]{26}\b/);
   if (!match) return text("Please provide a valid Event ID.");
 
   const eventId = match[0];

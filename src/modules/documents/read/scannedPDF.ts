@@ -13,7 +13,8 @@ export async function readScannedPDF(filePath: string): Promise<string> {
 
   let text = "";
   for (const page of pages) {
-    const extracted = await extractTextFromImage(String(page.path));
+    if (!page.path) continue;
+    const extracted = await extractTextFromImage(page.path);
     text += extracted + "\n";
   }
 

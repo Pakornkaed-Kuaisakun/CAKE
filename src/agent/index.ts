@@ -16,6 +16,18 @@ export interface AgentResponse {
   usage?: TokenUsage;
 }
 
+// Intents that return live data and must never be cached
+const UNCACHEABLE_INTENTS = new Set([
+  "email",
+  "news",
+  "weather",
+  "calendar_list",
+  "todo_list",
+  "cron_list",
+  "finance",
+  "search",
+]);
+
 export class CakeAgent {
   private provider: AIProvider;
   private history: ConversationHistory;
@@ -30,16 +42,16 @@ export class CakeAgent {
     this.memory = new MemoryManager(provider);
     this.model = model;
     this.fastModel = getFastModel(this.provider.name);
-    this.responseCache = new ResponseCache(100, 60_000); //100 entry
+    // 5 min TTL — only used for static/structural commands (tree, file read, etc.)
+    this.responseCache = new ResponseCache(100, 5 * 60_000);
 
-    // Initialize Cron - execute jobs through agent.run()
     initCronManager(async (job) => {
-      console.log(`[BOOT] Running scheduled task: ${job.taskDescription}`);
+      console.log(`[CRON] Running scheduled task: ${job.taskDescription}`);
       await this.run(job.taskDescription);
     });
   }
 
-  setModel(model: string | undefined) {
+  setModel(model: string | undefined): void {
     this.model = model;
   }
 
@@ -49,12 +61,8 @@ export class CakeAgent {
 
   async run(input: string): Promise<AgentResponse> {
     const cacheKey = `${this.provider.name}:${this.model ?? "default"}:${input.trim().toLowerCase()}`;
-    const cached = this.responseCache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
 
-    // 0) Pipeline / composed command
+    // 0) Pipeline / composed command — never cache pipelines
     if (hasPipe(input)) {
       const steps = parsePipeline(input);
       const pipeResult = await executePipeline(
@@ -63,29 +71,45 @@ export class CakeAgent {
         this.model,
       );
 
-      // Build the header shows what was chained
       const header = pipeResult.steps.length
         ? `[PIPELINE] ${pipeResult.steps.join(" → ")}\n\n`
         : "";
 
-      const response: AgentResponse = { text: header + pipeResult.text };
-      this.responseCache.set(cacheKey, response);
-      return response;
+      return { text: header + pipeResult.text };
     }
 
     // 1) Fast regex path first (no AI call)
     const regexHandler = matchRoute(input);
 
     if (regexHandler) {
+      // Check cache only for non-live routes
+      const cached = this.responseCache.get(cacheKey);
+      if (cached) return cached;
+
       const result = await regexHandler(this.provider, input, this.model);
       const response = { text: result.text, usage: result.usage };
-      this.responseCache.set(cacheKey, response);
 
-      // Save successful tool results to memory if they are informative
+      // Only cache structural/static commands — detect by checking intent keywords
+      const lowerInput = input.toLowerCase();
+      const isLive = [
+        "email",
+        "news",
+        "weather",
+        "calendar",
+        "events",
+        "cron",
+        "schedule",
+        "finance",
+        "stock",
+        "search",
+      ].some((k) => lowerInput.includes(k));
+      if (!isLive) {
+        this.responseCache.set(cacheKey, response);
+      }
+
       if (result.text.length > 50) {
         await this.memory.remember(
-          `User asked: ${input}
-          Result: ${result.text}`,
+          `User asked: ${input}\nResult: ${result.text}`,
           { source: "tool" },
         );
       }
@@ -93,18 +117,22 @@ export class CakeAgent {
     }
 
     // 2) AI intent router (fast model) only when regex did not match
-    const aiIntentPromise = aiIntentRouter(
-      this.provider,
-      input,
-      this.fastModel,
-    );
-    const intent = await aiIntentPromise;
+    const intent = await aiIntentRouter(this.provider, input, this.fastModel);
     const aiHandler = intentMap[intent];
 
     if (aiHandler) {
+      // Skip cache for live-data intents
+      if (!UNCACHEABLE_INTENTS.has(intent)) {
+        const cached = this.responseCache.get(cacheKey);
+        if (cached) return cached;
+      }
+
       const result = await aiHandler(this.provider, input, this.fastModel);
       const response = { text: result.text, usage: result.usage };
-      this.responseCache.set(cacheKey, response);
+
+      if (!UNCACHEABLE_INTENTS.has(intent)) {
+        this.responseCache.set(cacheKey, response);
+      }
       return response;
     }
 
@@ -125,13 +153,10 @@ export class CakeAgent {
 
     this.history.push("assistant", result.text);
 
-    // Save this interaction to memory for future RAG retrieval
     await this.memory.remember(`User: ${input}\nAssistant: ${result.text}`, {
       source: "conversation",
     });
 
-    const response = { text: result.text, usage: result.usage };
-    this.responseCache.set(cacheKey, response);
-    return response;
+    return { text: result.text, usage: result.usage };
   }
 }

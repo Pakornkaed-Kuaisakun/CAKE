@@ -9,9 +9,9 @@ export function getFastModel(provider: ProviderName): string | undefined {
     case "openai":
       return "gpt-4o-mini";
     case "claude":
-      return "claude-3-haiku-20240307";
+      return "claude-haiku--4-5";
     case "gemini":
-      return "gemini-1.5-flash";
+      return "gemini-2.0-flash";
     case "ollama":
       return "qwen2.5:3b";
     default:
