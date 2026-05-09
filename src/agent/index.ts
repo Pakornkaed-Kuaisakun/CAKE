@@ -9,6 +9,7 @@ import { SYSTEM_PROMPT } from "../config/constants.js";
 import { initCronManager } from "./handlers/cron.js";
 import { ResponseCache } from "./responseCache.js";
 import { getFastModel } from "../providers/utils.js";
+import { hasPipe, parsePipeline, executePipeline } from "./pipeline/index.js";
 
 export interface AgentResponse {
   text: string;
@@ -51,6 +52,25 @@ export class CakeAgent {
     const cached = this.responseCache.get(cacheKey);
     if (cached) {
       return cached;
+    }
+
+    // 0) Pipeline / composed command
+    if (hasPipe(input)) {
+      const steps = parsePipeline(input);
+      const pipeResult = await executePipeline(
+        steps,
+        this.provider,
+        this.model,
+      );
+
+      // Build the header shows what was chained
+      const header = pipeResult.steps.length
+        ? `[PIPELINE] ${pipeResult.steps.join(" → ")}\n\n`
+        : "";
+
+      const response: AgentResponse = { text: header + pipeResult.text };
+      this.responseCache.set(cacheKey, response);
+      return response;
     }
 
     // 1) Fast regex path first (no AI call)

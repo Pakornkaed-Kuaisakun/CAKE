@@ -169,6 +169,13 @@ export const ROUTES: Route[] = [
     patterns: [/\b(weather)\b/i],
     handler: H.handleWeather,
   },
+
+  {
+    patterns: [
+      /^(export|save|write)\s+(txt|md|json|csv|html|text|markdown)\b/i,
+    ],
+    handler: H.handleExport,
+  },
 ];
 
 /**

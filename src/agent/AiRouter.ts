@@ -39,6 +39,7 @@ export async function aiIntentRouter(
     - test_notify
     - finance
     - weather
+    - export
 
     GUIDELINES:
     1. If the user is just saying hello, asking who you are, or asking about your models/settings, use "chat".

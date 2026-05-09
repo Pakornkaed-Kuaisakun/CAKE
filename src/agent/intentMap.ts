@@ -34,4 +34,8 @@ export const intentMap: Record<string, Handler> = {
   test_notify: H.handleTestNotify,
   finance: H.handleFinanceReport,
   weather: H.handleWeather,
+  // Sink — also reachable as a standalone intent
+  export: H.handleExport,
+  save: H.handleExport,
+  write: H.handleExport,
 };

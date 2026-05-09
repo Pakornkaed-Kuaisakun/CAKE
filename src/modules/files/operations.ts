@@ -23,7 +23,7 @@ import { readDocument } from "../documents/index.js";
 export async function readFile(filePath: string): Promise<string> {
   const p = path.resolve(filePath);
   if (!fs.existsSync(p)) throw new Error("File not found");
-  
+
   try {
     return await readDocument(p);
   } catch (err) {
@@ -32,11 +32,11 @@ export async function readFile(filePath: string): Promise<string> {
   }
 }
 
-
-export function writeFile(filePath: string, content: string): void {
+export function writeFile(filePath: string, content: string): string {
   const p = path.resolve(filePath);
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, content, "utf-8");
+  return p;
 }
 
 export function listDirectory(dirPath: string): string[] {
@@ -51,9 +51,10 @@ export function listDirectory(dirPath: string): string[] {
   });
 }
 
-export function createDirectory(dirPath: string): void {
+export function createDirectory(dirPath: string): string {
   const p = path.resolve(dirPath);
   fs.mkdirSync(p, { recursive: true });
+  return p;
 }
 
 export function createDirectoryTree(
