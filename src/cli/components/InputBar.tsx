@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 
 import { Box, Text, useInput } from "ink";
 
-import TextInput from "ink-text-input";
+// import TextInput from "ink-text-input";
+import { TextEditor } from "./TextEditor.js";
 
 import { useAutocomplete } from "../hooks/useAutoComplete.js";
 
-import { CommandPopup } from "./CommandPopUp.js";
+import { CommandPopup } from "./CommandPopup.js";
 
 interface Props {
   value: string;
@@ -70,7 +71,7 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
       const selected = suggestions[selectedIndex];
 
       if (selected) {
-        onChange(selected.command);
+        onChange(selected.fullCommand);
       }
     }
 
@@ -82,7 +83,7 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
       const selected = suggestions[selectedIndex];
 
       if (selected) {
-        onChange(selected.command);
+        onChange(selected.fullCommand);
       }
     }
   });
@@ -96,9 +97,7 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
     >
       <CommandPopup suggestions={suggestions} selectedIndex={selectedIndex} />
       <Box>
-        <Text color='green'>› </Text>
-
-        <TextInput
+        <TextEditor
           value={value}
           onChange={onChange}
           onSubmit={onSubmit}
