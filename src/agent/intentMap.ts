@@ -17,6 +17,8 @@ export const intentMap: Record<string, Handler> = {
   calendar_remove: H.handleCalendarRemove,
   todo_list: H.handleTodoList,
   todo_add: H.handleTodoAdd,
+  todo_remove: H.handleTodoRemove,
+  todo_remove_all: H.handleTodoRemoveAll,
   plan: H.handlePlan,
   file_list: H.handleFileList,
   directory_tree: H.handleDirectoryTree,

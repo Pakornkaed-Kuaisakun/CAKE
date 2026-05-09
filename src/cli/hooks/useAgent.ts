@@ -39,7 +39,7 @@ const HELP = `
 
 SLASH COMMANDS:
   /help                    Show this help message
-  /clear                   Reset conversation & clear screen
+  /clear | /cls            Reset conversation & clear screen
   /reboost                 Re-initialize agent & clear session
   /exit                    Quit CAKE
 
@@ -164,6 +164,21 @@ export function useAgent() {
       const trimmed = value.trim();
       if (!trimmed) return;
       setInput("");
+      const lower = trimmed.toLowerCase();
+
+      // ── Handle cls/clear without slash ─────────────────────
+      if (lower === "cls" || lower === "clear") {
+        setMsgVersion((v) => v + 1);
+        setMessages([
+          {
+            id: makeId(),
+            role: "system",
+            content: "Conversation cleared.",
+          },
+        ]);
+        agent.clearHistory();
+        return;
+      }
 
       if (trimmed.startsWith("/")) {
         const [cmd, ...args] = trimmed.slice(1).split(" ");
@@ -181,6 +196,7 @@ export function useAgent() {
             return;
 
           // ── clear ─────────────────────────────────────────
+          case "cls":
           case "clear":
             setMsgVersion((v) => v + 1);
             setMessages([

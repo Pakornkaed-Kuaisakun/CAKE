@@ -60,6 +60,24 @@ export const ROUTES: Route[] = [
     handler: H.handleTodoList,
   },
 
+  // Todos — remove
+  {
+    patterns: [
+      /\b(remove|delete)\b.*\b(todo|task)\b/i,
+      /^todo_remove\b/,
+    ],
+    handler: H.handleTodoRemove,
+  },
+
+  // Todos — remove all
+  {
+    patterns: [
+      /\b(remove|delete|clear)\b.*\ball\b.*\b(todo|task)s?\b/i,
+      /^todo_remove_all$/,
+    ],
+    handler: H.handleTodoRemoveAll,
+  },
+
   // Plan
   {
     patterns: [/\b(plan|planning|break\s?down)\b.*\b(goal|project)\b/],

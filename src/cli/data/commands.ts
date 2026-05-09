@@ -25,6 +25,8 @@ export const COMMANDS: CommandSuggestion[] = [
   },
   { command: "todo_list", description: "List current todo tasks" },
   { command: "todo_add <task>", description: "Add new todo task" },
+  { command: "todo_remove <id>", description: "Remove a todo task by ID" },
+  { command: "todo_remove_all", description: "Remove all todo tasks" },
   { command: "plan <tasks>", description: "Create a plan for the day" },
   { command: "cron_list", description: "List all scheduled tasks" },
   { command: "cron_schedule <task>", description: "Schedule a new task" },
@@ -130,6 +132,7 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/help", description: "Show this help message" },
   { command: "/exit", description: "Exit the CLI" },
   { command: "/clear", description: "Clear the screen" },
+  { command: "/cls", description: "Clear the screen" },
   { command: "/reboost", description: "Re-initialize the agent and clear session" },
   {
     command: "/provider <name>",

@@ -1,5 +1,11 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { list as listTodos, add as addTodo, generatePlan } from "../../modules/todo/index.js";
+import {
+  list as listTodos,
+  add as addTodo,
+  remove as removeTodo,
+  removeAll as removeAllTodos,
+  generatePlan,
+} from "../../modules/todo/index.js";
 import { text } from "../utils/text.js";
 
 export async function handleTodoList(
@@ -37,4 +43,24 @@ export async function handlePlan(
   const todos = await generatePlan(provider, goal, model);
   const list = todos.map((t, i) => `  ${i + 1}. [${t.priority}] ${t.title}`).join("\n");
   return text(`[TODO] Created ${todos.length} tasks for "${goal}":\n${list}`);
+}
+
+export async function handleTodoRemove(
+  _provider: AIProvider,
+  input: string,
+  _model?: string,
+): Promise<ChatResult> {
+  const id = input.replace(/todo_remove\s*/i, "").trim();
+  if (!id) return text("Please provide a task ID to remove.");
+  const success = removeTodo(id);
+  return text(success ? `✅ Removed task: ${id}` : `❌ Task not found: ${id}`);
+}
+
+export async function handleTodoRemoveAll(
+  _provider: AIProvider,
+  _input: string,
+  _model?: string,
+): Promise<ChatResult> {
+  removeAllTodos();
+  return text("✅ All tasks removed.");
 }

@@ -22,6 +22,8 @@ export async function aiIntentRouter(
     - calendar_remove
     - todo_list
     - todo_add
+    - todo_remove
+    - todo_remove_all
     - plan
     - file_list
     - directory_tree

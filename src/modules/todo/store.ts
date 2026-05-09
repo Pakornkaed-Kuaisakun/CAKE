@@ -64,3 +64,7 @@ export function remove(id: string): boolean {
   saveAll(todos);
   return true;
 }
+
+export function removeAll(): void {
+  saveAll([]);
+}
