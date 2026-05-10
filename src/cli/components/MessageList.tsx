@@ -43,13 +43,16 @@ function formatTime(ms: number): string {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+import { useTheme } from "../theme/useTheme.js";
+
 function UserMessage({ content }: { content: string }) {
+  const { theme } = useTheme();
   return (
     <Box marginBottom={1}>
-      <Text color='green' bold>
+      <Text color={theme.primary} bold>
         You ›{" "}
       </Text>
-      <Text wrap='wrap'>{content}</Text>
+      <Text color={theme.text} wrap='wrap'>{content}</Text>
     </Box>
   );
 }
@@ -61,17 +64,18 @@ function AssistantMessage({
   content: string;
   thinkingTime?: number;
 }) {
+  const { theme } = useTheme();
   const wrapped = wrapText(content);
   return (
     <Box flexDirection='column' marginBottom={1}>
-      <Text color='cyan' bold>
+      <Text color={theme.secondary} bold>
         {"CAKE "}
         {thinkingTime !== undefined ? `(${formatTime(thinkingTime)}) ` : ""}
         {"›"}
       </Text>
       <Box paddingLeft={2} flexDirection='column'>
         {wrapped.split("\n").map((line, i) => (
-          <Text key={i} wrap='wrap'>
+          <Text key={i} color={theme.text} wrap='wrap'>
             {line}
           </Text>
         ))}
@@ -81,25 +85,24 @@ function AssistantMessage({
 }
 
 function SystemMessage({ content }: { content: string }) {
+  const { theme } = useTheme();
   const urlRegex = /(https?:\/\/[^\s]+)/g;
 
   return (
     <Box
       marginBottom={1}
-      borderStyle='round'
-      borderColor='yellow'
+      borderStyle='single'
+      borderColor={theme.secondary}
       paddingX={1}
       flexDirection='column'
     >
       {content.split("\n").map((line, i) => {
         const parts = line.split(urlRegex);
         return (
-          <Text key={i} color='yellow'>
+          <Text key={i} color={theme.text}>
             {parts.map((part, j) =>
-              // Render URLs in a brighter color so they stand out, but stay as plain text
-              // (Ink does not support clickable hyperlinks natively)
               urlRegex.test(part) ? (
-                <Text key={j} color='cyanBright'>
+                <Text key={j} color={theme.secondary} bold underline>
                   {part}
                 </Text>
               ) : (

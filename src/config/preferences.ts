@@ -9,6 +9,7 @@ import os from "os";
 export interface Preferences {
   provider: string;
   model: string | null;
+  theme: string;
 }
 
 const PREFS_DIR = path.join(os.homedir(), ".cake");
@@ -17,6 +18,7 @@ const PREFS_FILE = path.join(PREFS_DIR, "prefs.json");
 const DEFAULTS: Preferences = {
   provider: "claude",
   model: null,
+  theme: "dark",
 };
 
 /** Load preferences from disk. Returns defaults if file doesn't exist. */
@@ -28,6 +30,7 @@ export function loadPrefs(): Preferences {
     return {
       provider: parsed.provider ?? DEFAULTS.provider,
       model: parsed.model ?? DEFAULTS.model,
+      theme: parsed.theme ?? DEFAULTS.theme,
     };
   } catch {
     return { ...DEFAULTS };
@@ -40,6 +43,7 @@ export function savePrefs(prefs: Partial<Preferences>): void {
   const next: Preferences = {
     provider: prefs.provider ?? current.provider,
     model: prefs.model !== undefined ? prefs.model : current.model,
+    theme: prefs.theme ?? current.theme,
   };
   if (!fs.existsSync(PREFS_DIR)) {
     fs.mkdirSync(PREFS_DIR, { recursive: true });

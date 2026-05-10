@@ -1,6 +1,7 @@
 // src/cli/components/CommandPopUp.tsx
 import type { ComponentProps } from "react";
 import React from "react";
+import { useTheme } from "../theme/useTheme.js";
 
 import { Box, Text } from "ink";
 
@@ -19,6 +20,8 @@ interface Props {
 const MAX_VISIBLE = 4;
 
 export function CommandPopup({ suggestions, selectedIndex }: Props) {
+  const { theme } = useTheme();
+
   if (suggestions.length === 0) {
     return null;
   }
@@ -33,9 +36,9 @@ export function CommandPopup({ suggestions, selectedIndex }: Props) {
 
   return (
     <Box flexDirection='column' marginTop={0.5} marginBottom={1}>
-      <Text dimColor>Suggestions ({suggestions.length})</Text>
+      <Text color={theme.muted}>Suggestions ({suggestions.length})</Text>
 
-      {start > 0 && <Text dimColor>↑ more</Text>}
+      {start > 0 && <Text color={theme.muted}>↑ more</Text>}
 
       {visible.map((suggestion, index) => {
         const realIndex = start + index;
@@ -43,7 +46,10 @@ export function CommandPopup({ suggestions, selectedIndex }: Props) {
         const active = realIndex === selectedIndex;
 
         return (
-          <Text key={suggestion.command} color={active ? "green" : "white"}>
+          <Text
+            key={suggestion.command}
+            color={active ? theme.primary : theme.text}
+          >
             {active ? "❯ " : "  "}
 
             {suggestion.command}
@@ -51,7 +57,9 @@ export function CommandPopup({ suggestions, selectedIndex }: Props) {
         );
       })}
 
-      {start + MAX_VISIBLE < suggestions.length && <Text dimColor>↓ more</Text>}
+      {start + MAX_VISIBLE < suggestions.length && (
+        <Text color={theme.muted}>↓ more</Text>
+      )}
     </Box>
   );
 }

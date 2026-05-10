@@ -10,6 +10,7 @@ import { TextEditor } from "./TextEditor.js";
 import { useAutocomplete } from "../hooks/useAutoComplete.js";
 
 import { CommandPopup } from "./CommandPopup.js";
+import { useTheme } from "../theme/useTheme.js";
 
 interface Props {
   value: string;
@@ -23,6 +24,7 @@ interface Props {
 
 export function InputBar({ value, onChange, onSubmit, loading }: Props) {
   const suggestions = useAutocomplete(value);
+  const { theme } = useTheme();
 
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -92,7 +94,7 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
     <Box
       flexDirection='column'
       borderStyle='single'
-      borderColor={loading ? "gray" : "green"}
+      borderColor={loading ? theme.muted : theme.border}
       paddingX={1}
     >
       <CommandPopup suggestions={suggestions} selectedIndex={selectedIndex} />

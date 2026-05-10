@@ -3,5 +3,10 @@
 import React from "react";
 import { render } from "ink";
 import { App } from "./App.js";
+import { ThemeProvider } from "./theme/ThemeProvider.js";
 
-render(<App />);
+render(
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>,
+);

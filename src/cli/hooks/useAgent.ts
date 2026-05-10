@@ -21,6 +21,8 @@ import {
   savePrefs,
   prefsFilePath,
 } from "../../config/preferences.js";
+import { useTheme } from "../theme/useTheme.js";
+import { THEMES } from "../theme/theme.js";
 
 const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
@@ -39,7 +41,7 @@ const HELP = `
 
 SLASH COMMANDS:
   /help                    Show this help message
-  /clear | /cls            Reset conversation & clear screen
+  /clear                   Reset conversation & clear screen
   /reboost                 Re-initialize agent & clear session
   /exit                    Quit CAKE
 
@@ -49,6 +51,7 @@ CONFIGURATION:
   /prefs                   Show current session & default settings
   /default [--save]        Save current session as your default
   /default --reset         Clear all saved defaults
+  /theme <name>            Switch theme: dark | light | neon | dracula
 
 INTEGRATIONS:
   /calendar auth           Connect to Google Calendar
@@ -86,6 +89,7 @@ function buildAgent(provName: ProviderName, mod?: string): CakeAgent {
 
 export function useAgent() {
   const { exit } = useApp();
+  const { theme, setTheme: setAppTheme } = useTheme();
 
   // ─── Message list ────────────────────────────────────────
   const [msgVersion, setMsgVersion] = useState(0);
@@ -140,7 +144,6 @@ export function useAgent() {
       setThinkingMs(Date.now() - t0);
     }, 100);
   }, []);
-
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -384,11 +387,37 @@ export function useAgent() {
             }
 
             // ── /default [--save] — save current session values ──
-            savePrefs({ provider: providerName, model: model ?? null });
+            savePrefs({
+              provider: providerName,
+              model: model ?? null,
+              theme: theme.name,
+            });
             addMsg(
               "system",
               `✅ Saved default: provider=${providerName}${model ? `, model=${model}` : ", model=(none)"}\n   Stored in: ${prefsFilePath()}`,
             );
+            return;
+          }
+
+          // ── theme ────────────────────────────────────────
+          case "theme": {
+            const name = args[0];
+            if (!name) {
+              addMsg(
+                "system",
+                `Available themes: ${Object.keys(THEMES).join(", ")}\nUsage: /theme <name>`,
+              );
+              return;
+            }
+            if (THEMES[name]) {
+              setAppTheme(name);
+              addMsg("system", `✅ Theme switched to: ${name}`);
+            } else {
+              addMsg(
+                "system",
+                `Unknown theme: ${name}. Available: ${Object.keys(THEMES).join(", ")}`,
+              );
+            }
             return;
           }
 
@@ -401,10 +430,12 @@ export function useAgent() {
                 `Preferences file: ${prefsFilePath()}`,
                 `  provider : ${current.provider}`,
                 `  model    : ${current.model ?? "(none)"}`,
+                `  theme    : ${theme.name}`,
                 ``,
                 `Active this session:`,
                 `  provider : ${providerName}`,
                 `  model    : ${model ?? "(none)"}`,
+                `  theme    : ${theme.name}`,
               ].join("\n"),
             );
             return;
@@ -545,7 +576,6 @@ export function useAgent() {
         accumulateUsage(resp.usage);
         addMsg("assistant", resp.text, finalTime);
       } catch (err) {
-
         stopTimer();
         addMsg(
           "system",
@@ -555,7 +585,6 @@ export function useAgent() {
         setLoading(false);
         setThinkingMs(null);
       }
-
     },
     [
       agent,

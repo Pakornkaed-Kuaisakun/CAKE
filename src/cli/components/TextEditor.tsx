@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 
 import { Box, Text, useInput } from "ink";
+import { useTheme } from "../theme/useTheme.js";
 
 interface Props {
   value: string;
@@ -23,6 +24,7 @@ export function TextEditor({
   placeholder,
   disabled = false,
 }: Props) {
+  const { theme } = useTheme();
   /**
    * Cursor position
    */
@@ -465,7 +467,7 @@ export function TextEditor({
         <>
           <Text inverse={cursorVisible}> </Text>
 
-          {placeholder && <Text color='gray'>{placeholder}</Text>}
+          {placeholder && <Text color={theme.muted}>{placeholder}</Text>}
         </>
       );
     }
@@ -481,8 +483,9 @@ export function TextEditor({
           return (
             <Text
               key={index}
+              color={theme.text}
               inverse={Boolean(isCursor)}
-              backgroundColor={isSelected ? "blue" : undefined}
+              backgroundColor={isSelected ? theme.secondary : undefined}
             >
               {char}
             </Text>
@@ -492,11 +495,11 @@ export function TextEditor({
         {cursor === value.length && <Text inverse={cursorVisible}> </Text>}
       </>
     );
-  }, [value, cursor, selection, placeholder, cursorVisible]);
+  }, [value, cursor, selection, placeholder, cursorVisible, theme]);
 
   return (
     <Box>
-      <Text color='green'>›</Text>
+      <Text color={theme.primary}>›</Text>
 
       <Box marginLeft={1}>{rendered}</Box>
     </Box>

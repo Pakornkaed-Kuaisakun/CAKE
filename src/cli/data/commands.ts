@@ -10,7 +10,8 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Read and summarize emails from inbox (top 5)",
   },
   {
-    command: "email_send to <email> subject <subject> [body <body>] [attach <path>]",
+    command:
+      "email_send to <email> subject <subject> [body <body>] [attach <path>]",
     description: "Send a new email with optional attachment",
   },
   { command: "news", description: "Fetch top 5 news from each RSS feed" },
@@ -132,8 +133,10 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/help", description: "Show this help message" },
   { command: "/exit", description: "Exit the CLI" },
   { command: "/clear", description: "Clear the screen" },
-  { command: "/cls", description: "Clear the screen" },
-  { command: "/reboost", description: "Re-initialize the agent and clear session" },
+  {
+    command: "/reboost",
+    description: "Re-initialize the agent and clear session",
+  },
   {
     command: "/provider <name>",
     description:
@@ -146,6 +149,10 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Save current session as your default",
   },
   { command: "/default --reset", description: "Clear all saved defaults" },
+  {
+    command: "/theme <name>",
+    description: "Switch theme: dark | light | neon | dracula",
+  },
   { command: "/calendar auth", description: "Re-authenticate Google Calendar" },
   {
     command: "/auth-status",
