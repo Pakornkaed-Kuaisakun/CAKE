@@ -14,6 +14,7 @@ export const THEMES: Record<string, Theme> = {
     info: "#3b82f6", // Blue 500
     background: "#0f172a", // Slate 900
     foreground: "#f8fafc", // Slate 50
+    parameter: "#f472b6", // Pink 400
   },
 
   light: {
@@ -29,6 +30,7 @@ export const THEMES: Record<string, Theme> = {
     info: "#2563eb", // Blue 600
     background: "#ffffff", // White
     foreground: "#0f172a", // Slate 900
+    parameter: "#db2777", // Pink 600
   },
 
   neon: {
@@ -44,6 +46,7 @@ export const THEMES: Record<string, Theme> = {
     info: "#38bdf8", // Sky 400
     background: "#000000", // Black
     foreground: "#ffffff", // White
+    parameter: "#facc15", // Yellow 400
   },
 
   dracula: {
@@ -59,5 +62,6 @@ export const THEMES: Record<string, Theme> = {
     info: "#8be9fd", // Cyan
     background: "#282a36", // Background
     foreground: "#f8f8f2", // Foreground
+    parameter: "#f1fa8c", // Yellow
   },
 };

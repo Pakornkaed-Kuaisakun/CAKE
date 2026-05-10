@@ -11,4 +11,5 @@ export interface Theme {
   info: string;
   background: string;
   foreground: string;
+  parameter: string;
 }

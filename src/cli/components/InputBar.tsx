@@ -11,6 +11,7 @@ import { useAutocomplete } from "../hooks/useAutoComplete.js";
 
 import { CommandPopup } from "./CommandPopup.js";
 import { useTheme } from "../theme/useTheme.js";
+import { APP_NAME } from "../../config/constants.js";
 
 interface Props {
   value: string;
@@ -103,7 +104,7 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
           value={value}
           onChange={onChange}
           onSubmit={onSubmit}
-          placeholder={loading ? "Waiting..." : "Ask CAKE anything..."}
+          placeholder={loading ? "Waiting..." : `Ask ${APP_NAME} anything...`}
         />
       </Box>
     </Box>

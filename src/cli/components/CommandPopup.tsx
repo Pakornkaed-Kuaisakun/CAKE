@@ -19,6 +19,40 @@ interface Props {
 
 const MAX_VISIBLE = 4;
 
+function CommandWithPlaceholders({
+  text,
+  active,
+}: {
+  text: string;
+  active: boolean;
+}) {
+  const { theme } = useTheme();
+  // Split by <...>, [...]
+  const parts = text.split(/(<[^>]+>|\[[^\]]+\])/g);
+
+  return (
+    <Text color={active ? theme.primary : theme.text}>
+      {parts.map((part, i) => {
+        if (part.startsWith("<") && part.endsWith(">")) {
+          return (
+            <Text key={i} color={theme.parameter}>
+              {part}
+            </Text>
+          );
+        }
+        if (part.startsWith("[") && part.endsWith("]")) {
+          return (
+            <Text key={i} color={theme.muted}>
+              {part}
+            </Text>
+          );
+        }
+        return part;
+      })}
+    </Text>
+  );
+}
+
 export function CommandPopup({ suggestions, selectedIndex }: Props) {
   const { theme } = useTheme();
 
@@ -46,14 +80,22 @@ export function CommandPopup({ suggestions, selectedIndex }: Props) {
         const active = realIndex === selectedIndex;
 
         return (
-          <Text
-            key={suggestion.command}
-            color={active ? theme.primary : theme.text}
-          >
-            {active ? "❯ " : "  "}
-
-            {suggestion.command}
-          </Text>
+          <Box key={suggestion.command} flexDirection='row'>
+            <Text color={active ? theme.primary : theme.text}>
+              {active ? "❯ " : "  "}
+            </Text>
+            <CommandWithPlaceholders
+              text={suggestion.command}
+              active={active}
+            />
+            {suggestion.description && (
+              <Box marginLeft={2}>
+                <Text color={theme.muted} dimColor={!active}>
+                  {suggestion.description}
+                </Text>
+              </Box>
+            )}
+          </Box>
         );
       })}
 

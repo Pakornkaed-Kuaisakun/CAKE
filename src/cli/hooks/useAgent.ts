@@ -13,7 +13,7 @@ import {
   createEvent,
   deleteEvent,
 } from "../../modules/calendar/index.js";
-import { TOKEN_FILE } from "../../config/constants.js";
+import { TOKEN_FILE, APP_NAME } from "../../config/constants.js";
 import type { ChatMessage } from "../components/MessageList.js";
 import { env } from "../../config/env.js";
 import {
@@ -37,13 +37,13 @@ const INIT_PROVIDER = (PREFS.provider || env.defaultProvider) as ProviderName;
 const INIT_MODEL = PREFS.model || env.defaultModel || undefined;
 
 const HELP = `
-🍰 CAKE - The Ultimate AI Assistant
+🍰 ${APP_NAME} - The Ultimate AI Assistant
 
 SLASH COMMANDS:
   /help                    Show this help message
   /clear                   Reset conversation & clear screen
   /reboost                 Re-initialize agent & clear session
-  /exit                    Quit CAKE
+  /exit                    Quit ${APP_NAME}
 
 CONFIGURATION:
   /provider <name>         Switch: claude | openai | gemini | ollama
@@ -69,7 +69,7 @@ NATURAL LANGUAGE CAPABILITIES:
   🕒 Automation (Cron)     "Schedule: summarize emails every morning at 8am", "List my cron jobs", "test notify"
 
 
-    Tip: CAKE has Long-term Memory and can run automated background tasks!
+    Tip: ${APP_NAME} has Long-term Memory and can run automated background tasks!
     `.trim();
 
 function makeId() {
@@ -98,7 +98,7 @@ export function useAgent() {
       id: "welcome",
       role: "system",
       content: [
-        `CAKE ready.`,
+        `${APP_NAME} ready.`,
         `Provider: ${INIT_PROVIDER}${INIT_MODEL ? ` · model: ${INIT_MODEL}` : ""}`,
         `Defaults loaded from: ${prefsFilePath()}`,
         `Type /help for commands.`,

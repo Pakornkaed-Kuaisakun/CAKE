@@ -44,6 +44,7 @@ function formatTime(ms: number): string {
 }
 
 import { useTheme } from "../theme/useTheme.js";
+import { APP_NAME } from "../../config/constants.js";
 
 function UserMessage({ content }: { content: string }) {
   const { theme } = useTheme();
@@ -69,7 +70,7 @@ function AssistantMessage({
   return (
     <Box flexDirection='column' marginBottom={1}>
       <Text color={theme.secondary} bold>
-        {"CAKE "}
+        {`${APP_NAME} `}
         {thinkingTime !== undefined ? `(${formatTime(thinkingTime)}) ` : ""}
         {"›"}
       </Text>

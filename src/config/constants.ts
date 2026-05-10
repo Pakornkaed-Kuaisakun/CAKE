@@ -1,7 +1,9 @@
 import path from "path";
 import os from "os";
 
-export const CAKE_DIR = path.join(os.homedir(), ".cake");
+export const APP_NAME = "CAKE";
+
+export const CAKE_DIR = path.join(os.homedir(), `.${APP_NAME.toLowerCase()}`);
 export const TODO_FILE = path.join(CAKE_DIR, "todos.json");
 export const TOKEN_FILE = path.join(CAKE_DIR, "google-token.json");
 
@@ -9,7 +11,7 @@ export const GOOGLE_SCOPES = ["https://www.googleapis.com/auth/calendar"];
 
 export const SYSTEM_PROMPT = `
     # ROLE
-    You are CAKE, a hyper-intelligent personal assistant with access to powerful tools.
+    You are ${APP_NAME}, a hyper-intelligent personal assistant with access to powerful tools.
     Your goal is to handle **all** user requests with extreme accuracy, speed, and natural language mastery.
 
     # PERSONALITY
@@ -41,4 +43,3 @@ export const SYSTEM_PROMPT = `
 `;
 
 export const APP_VERSION = "0.2.0";
-export const APP_NAME = "CAKE";

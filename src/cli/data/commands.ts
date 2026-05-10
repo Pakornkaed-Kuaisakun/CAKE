@@ -1,6 +1,7 @@
 export interface CommandSuggestion {
   command: string;
   description: string;
+  parameters?: string[];
 }
 
 export const COMMANDS: CommandSuggestion[] = [
@@ -15,6 +16,11 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Send a new email with optional attachment",
   },
   { command: "news", description: "Fetch top 5 news from each RSS feed" },
+  {
+    command: "calendar",
+    description: "Google Calendar management",
+    parameters: ["auth", "list", "create", "delete"],
+  },
   { command: "calendar_list", description: "List upcoming events" },
   {
     command: "calendar_create <events>",
@@ -62,6 +68,11 @@ export const COMMANDS: CommandSuggestion[] = [
   },
 
   // ── Export sink (standalone) ────────────────────────────────────────────────
+  {
+    command: "export",
+    description: "Export last result to a file",
+    parameters: ["txt", "md", "json", "csv", "html"],
+  },
   {
     command: "export txt <filename>",
     description: "Export last result to a .txt file",
@@ -139,8 +150,8 @@ export const COMMANDS: CommandSuggestion[] = [
   },
   {
     command: "/provider <name>",
-    description:
-      "Switch to a different LLM provider (claude/openai/gemini/ollama)",
+    description: "Switch to a different LLM provider",
+    parameters: ["claude", "openai", "gemini", "ollama"],
   },
   { command: "/model <name>", description: "Switch to a different model" },
   { command: "/prefs", description: "Show current session & default settings" },
@@ -152,6 +163,12 @@ export const COMMANDS: CommandSuggestion[] = [
   {
     command: "/theme <name>",
     description: "Switch theme: dark | light | neon | dracula",
+    parameters: ["dark", "light", "neon", "dracula"],
+  },
+  {
+    command: "/calendar <action>",
+    description: "Google Calendar management",
+    parameters: ["auth", "list", "create", "delete"],
   },
   { command: "/calendar auth", description: "Re-authenticate Google Calendar" },
   {
