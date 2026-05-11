@@ -36,7 +36,9 @@ export class GeminiProvider implements AIProvider {
     if (!lastMessage) return { text: "" };
 
     const chat = genModel.startChat({ history });
-    const result = await chat.sendMessage(lastMessage.content);
+    const result = await chat.sendMessage(lastMessage.content, {
+      signal: options.signal,
+    });
     const text = result.response.text();
 
     const meta = result.response.usageMetadata;

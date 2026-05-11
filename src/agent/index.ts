@@ -59,7 +59,7 @@ export class CakeAgent {
     this.history.clear();
   }
 
-  async run(input: string): Promise<AgentResponse> {
+  async run(input: string, signal?: AbortSignal): Promise<AgentResponse> {
     const cacheKey = `${this.provider.name}:${this.model ?? "default"}:${input.trim().toLowerCase()}`;
 
     // 0) Pipeline / composed command — never cache pipelines
@@ -93,16 +93,20 @@ export class CakeAgent {
       const lowerInput = input.toLowerCase();
       const isLive = [
         "email",
-        "email_send",
         "news",
         "weather",
         "calendar",
-        "events",
+        "todo",
         "cron",
-        "schedule",
         "finance",
-        "stock",
         "search",
+        "file",
+        "ls",
+        "cat",
+        "tree",
+        "document",
+        "memory",
+        "notify",
       ].some((k) => lowerInput.includes(k));
       if (!isLive) {
         this.responseCache.set(cacheKey, response);
@@ -150,6 +154,7 @@ export class CakeAgent {
     const result = await this.provider.chat(this.history.getAll(), {
       systemPrompt: SYSTEM_PROMPT + contextString,
       model: this.model,
+      signal,
     });
 
     this.history.push("assistant", result.text);

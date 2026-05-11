@@ -34,16 +34,19 @@ export class ClaudeProvider implements AIProvider {
       systemMessages.map((m) => m.content).join("\n") ??
       "You are CAKE, a helpful AI assistant.";
 
-    const response = await this.client.messages.create({
-      model,
-      system,
-      max_tokens: maxTokens,
-      temperature,
-      messages: chatMessages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-    });
+    const response = await this.client.messages.create(
+      {
+        model,
+        system,
+        max_tokens: maxTokens,
+        temperature,
+        messages: chatMessages.map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: m.content,
+        })),
+      },
+      { signal: options.signal },
+    );
 
     const text = response.content
       .filter((b) => b.type === "text")

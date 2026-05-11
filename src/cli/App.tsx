@@ -34,7 +34,7 @@ export function App() {
   const hasUsage = stats.totalInputTokens > 0 || stats.totalOutputTokens > 0;
 
   return (
-    <Box flexDirection="column" padding={1}>
+    <Box flexDirection="column">
       <Header provider={providerName} model={model} />
 
       <MessageList messages={messages} version={msgVersion} />

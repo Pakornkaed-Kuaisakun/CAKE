@@ -23,6 +23,8 @@ import {
 } from "../../config/preferences.js";
 import { useTheme } from "../theme/useTheme.js";
 import { THEMES } from "../theme/theme.js";
+import { COMMANDS } from "../data/commands.js";
+import { addCost, loadCosts, resetCosts, costsFilePath } from "../../config/costs.js";
 
 const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
@@ -36,41 +38,31 @@ const PREFS = loadPrefs();
 const INIT_PROVIDER = (PREFS.provider || env.defaultProvider) as ProviderName;
 const INIT_MODEL = PREFS.model || env.defaultModel || undefined;
 
-const HELP = `
-🍰 ${APP_NAME} - The Ultimate AI Assistant
-
-SLASH COMMANDS:
-  /help                    Show this help message
-  /clear                   Reset conversation & clear screen
-  /reboost                 Re-initialize agent & clear session
-  /exit                    Quit ${APP_NAME}
-
-CONFIGURATION:
-  /provider <name>         Switch: claude | openai | gemini | ollama
-  /model <name>            Set model (e.g. gpt-4o, llama3)
-  /prefs                   Show current session & default settings
-  /default [--save]        Save current session as your default
-  /default --reset         Clear all saved defaults
-  /theme <name>            Switch theme: dark | light | neon | dracula
-
-INTEGRATIONS:
-  /calendar auth           Connect to Google Calendar
-  /calendar list           View upcoming schedule
-  /auth-status             Check API & OAuth connections
-
-NATURAL LANGUAGE CAPABILITIES:
-  📧 Email & News          "Read my emails", "Today's news digest"
-  ✅ Productivity           "Add todo: fix bug", "List my tasks", "Plan a project"
-  🌐 Web & Search          "Search for latest AI news", "Who is...?"
-  📂 Files & Folders       "ls src", "tree .", "cat report.txt", "summarize code.js"
-  📄 Documents (RAG)       "read doc.pdf", "summarize book.docx", "ask doc.pdf <question>"
-  🧠 Memory (Learning)     "Learn manual.pdf" (Index to memory for future retrieval)
-  ⚙️ System                "Diagnose system", "Performance check"
-  🕒 Automation (Cron)     "Schedule: summarize emails every morning at 8am", "List my cron jobs", "test notify"
-
-
-    Tip: ${APP_NAME} has Long-term Memory and can run automated background tasks!
-    `.trim();
+const HELP = [
+  `🍰 ${APP_NAME} - The Ultimate AI Assistant`,
+  "",
+  "SLASH COMMANDS:",
+  ...COMMANDS.filter((c) => c.command.startsWith("/"))
+    .filter(
+      (c, i, self) => i === self.findIndex((t) => t.command === c.command),
+    ) // unique
+    .map(
+      (c) =>
+        `  ${c.command.split(" ")[0].padEnd(20)} ${c.description.split("\n")[0]}`,
+    ),
+  "",
+  "AGENT CAPABILITIES:",
+  ...COMMANDS.filter((c) => !c.command.startsWith("/") && !c.command.includes("|"))
+    .filter(
+      (c, i, self) => i === self.findIndex((t) => t.command === c.command),
+    ) // unique
+    .map(
+      (c) =>
+        `  ${c.command.split(" ")[0].padEnd(20)} ${c.description.split("\n")[0]}`,
+    ),
+  "",
+  `Tip: ${APP_NAME} has Long-term Memory and can run automated background tasks!`,
+].join("\n");
 
 function makeId() {
   return Date.now().toString() + Math.random().toString(36).slice(2);
@@ -110,6 +102,7 @@ export function useAgent() {
   const [loading, setLoading] = useState(false);
   const [thinkingMs, setThinkingMs] = useState<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [providerName, setProviderName] = useState<ProviderName>(INIT_PROVIDER);
   const [model, setModel] = useState<string | undefined>(INIT_MODEL);
@@ -159,6 +152,12 @@ export function useAgent() {
       totalOutputTokens: prev.totalOutputTokens + usage.outputTokens,
       totalCostUsd: prev.totalCostUsd + (usage.costUsd ?? 0),
     }));
+    // Persist to disk
+    addCost({
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      costUsd: usage.costUsd,
+    });
   }, []);
 
   // ─── Submit handler ───────────────────────────────────────
@@ -185,6 +184,42 @@ export function useAgent() {
 
       if (trimmed.startsWith("/")) {
         const [cmd, ...args] = trimmed.slice(1).split(" ");
+
+        if (cmd === "stop") {
+          if (loading && abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            addMsg("system", "🛑 AI Thinking stopped by user.");
+            setLoading(false);
+            stopTimer();
+          } else {
+            addMsg("system", "Nothing is currently running.");
+          }
+          return;
+        }
+
+        if (cmd === "cost") {
+          if (args[0] === "--reset") {
+            resetCosts();
+            addMsg("system", "✅ All historical costs and usage have been reset.");
+            return;
+          }
+          const historical = loadCosts();
+          addMsg(
+            "system",
+            [
+              `💰 Historical Token Usage & Costs (${APP_NAME})`,
+              `----------------------------------------`,
+              `Total Input Tokens  : ${historical.totalInputTokens.toLocaleString()}`,
+              `Total Output Tokens : ${historical.totalOutputTokens.toLocaleString()}`,
+              `Total Cost (USD)    : $${historical.totalCostUsd.toFixed(4)}`,
+              `Last Updated        : ${new Date(historical.lastUpdated).toLocaleString()}`,
+              `----------------------------------------`,
+              `Data stored in: ${costsFilePath()}`,
+              `Tip: Use /cost --reset to clear history.`,
+            ].join("\n"),
+          );
+          return;
+        }
 
         switch (cmd) {
           // ── exit ──────────────────────────────────────────
@@ -564,19 +599,26 @@ export function useAgent() {
         }
       }
 
-      // ── Agent ─────────────────────────────────────────────
       addMsg("user", trimmed);
       setLoading(true);
-      const t0 = Date.now(); // เริ่มจับเวลาตรงนี้
+      const t0 = Date.now();
       startTimer();
+
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       try {
-        const resp = await agent.run(trimmed);
-        const finalTime = Date.now() - t0; // คำนวณเวลาที่ใช้ไปจริง
+        const resp = await agent.run(trimmed, controller.signal);
+        const finalTime = Date.now() - t0;
         stopTimer();
         accumulateUsage(resp.usage);
         addMsg("assistant", resp.text, finalTime);
-      } catch (err) {
+      } catch (err: any) {
         stopTimer();
+        if (err.name === "AbortError" || err.message?.includes("abort")) {
+          // Handled above in /stop logic
+          return;
+        }
         addMsg(
           "system",
           `Error: ${err instanceof Error ? err.message : String(err)}`,
@@ -584,6 +626,7 @@ export function useAgent() {
       } finally {
         setLoading(false);
         setThinkingMs(null);
+        abortControllerRef.current = null;
       }
     },
     [

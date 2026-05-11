@@ -15,27 +15,9 @@ interface Props {
   version?: number;
 }
 
-/** Wrap long text to a given column width */
-function wrapText(text: string, width = 72): string {
-  return text
-    .split("\n")
-    .map((line) => {
-      if (line.length <= width) return line;
-      const words = line.split(" ");
-      const wrapped: string[] = [];
-      let current = "";
-      for (const word of words) {
-        if ((current + (current ? " " : "") + word).length > width) {
-          if (current) wrapped.push(current);
-          current = word;
-        } else {
-          current = current ? `${current} ${word}` : word;
-        }
-      }
-      if (current) wrapped.push(current);
-      return wrapped.join("\n  ");
-    })
-    .join("\n");
+/** No-op wrap since we use Ink's wrap prop */
+function wrapText(text: string): string {
+  return text;
 }
 
 function formatTime(ms: number): string {
@@ -119,7 +101,7 @@ function SystemMessage({ content }: { content: string }) {
 
 export function MessageList({ messages, version }: Props) {
   return (
-    <Box key={version} flexDirection='column'>
+    <Box flexDirection='column'>
       {messages.map((msg) => {
         if (msg.role === "user")
           return <UserMessage key={msg.id} content={msg.content} />;

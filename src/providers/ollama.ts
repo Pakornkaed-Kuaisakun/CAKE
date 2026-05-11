@@ -18,6 +18,8 @@ export class OllamaProvider implements AIProvider {
       model,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       options: temperature !== undefined ? { temperature } : undefined,
+      // @ts-ignore
+      signal: options.signal,
     });
 
     return {

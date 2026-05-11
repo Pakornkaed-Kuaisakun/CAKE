@@ -35,12 +35,15 @@ export class OpenAIProvider implements AIProvider {
       }
     }
 
-    const response = await this.client.chat.completions.create({
-      model,
-      messages: allMessages,
-      max_tokens: maxTokens,
-      temperature,
-    });
+    const response = await this.client.chat.completions.create(
+      {
+        model,
+        messages: allMessages,
+        max_tokens: maxTokens,
+        temperature,
+      },
+      { signal: options.signal },
+    );
 
     const text = response.choices[0]?.message?.content ?? "";
     const inp = response.usage?.prompt_tokens ?? 0;
