@@ -137,6 +137,16 @@ export const ROUTES: Route[] = [
     handler: H.handleFileCompose,
   },
 
+  // File — find
+  {
+    patterns: [
+      /\b(find|search)\b.*\b(file|folder|directory)\b/,
+      /^find\s+\S+/,
+      /^file_find\b/,
+    ],
+    handler: H.handleFindFile,
+  },
+
   // Search
   {
     patterns: [/\b(search|find|what is|who is|look up|google)\b/],
@@ -201,6 +211,10 @@ export const ROUTES: Route[] = [
       /^(export|save|write)\s+(txt|md|json|csv|html|text|markdown)\b/i,
     ],
     handler: H.handleExport,
+  },
+  {
+    patterns: [/\b(security|scan|virus|malware)\b/i],
+    handler: H.handleSecurityScan,
   },
 ];
 

@@ -53,6 +53,7 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "file_read <path>", description: "Read a file" },
   { command: "file_summarize <path>", description: "Summarize a file" },
   { command: "file_compose <path>", description: "Compose a file" },
+  { command: "file_find <query> [in <path>]", description: "Find files by name or fuzzy search" },
   { command: "search <query>", description: "Search the web for information" },
   {
     command: "memory_index <path>",
@@ -65,6 +66,10 @@ export const COMMANDS: CommandSuggestion[] = [
   {
     command: "weather",
     description: "Get weather report (from IP geolocation)",
+  },
+  {
+    command: "scan <directory>",
+    description: "Perform security scan for malware or suspicious patterns",
   },
 
   // ── Export sink (standalone) ────────────────────────────────────────────────
@@ -130,6 +135,14 @@ export const COMMANDS: CommandSuggestion[] = [
   {
     command: "file_summarize <path> | export txt summary.txt",
     description: "Summarize a file and save to text",
+  },
+  {
+    command: "file_find <query> | export md results.md",
+    description: "Find files and save search results to Markdown",
+  },
+  {
+    command: "file_find <query> in <path> | export txt results.txt",
+    description: "Search in specific directory and save results",
   },
   {
     command: "search <query> | export md results.md",

@@ -1,3 +1,4 @@
+import path from "path";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import {
   readFile,
@@ -5,8 +6,11 @@ import {
   createDirectoryTree,
   summarizeFile,
   composeFile,
+  findFiles,
 } from "../../modules/files/index.js";
 import { text } from "../utils/text.js";
+import { formatSize } from "../utils/format.js";
+
 
 export async function handleFileList(
   _provider: AIProvider,
@@ -46,7 +50,6 @@ export async function handleFileRead(
   return text(
     `[FILES] ${filePath}\n${"─".repeat(40)}\n${content.slice(0, 3000)}`,
   );
-
 }
 
 export async function handleFileSummarize(
@@ -79,4 +82,36 @@ export async function handleFileCompose(
   return text(
     `[FILES] Created ${match[1]}\n${"─".repeat(40)}\n${content.slice(0, 1000)}`,
   );
+}
+
+export async function handleFindFile(
+  _provider: AIProvider,
+  input: string,
+  _model?: string,
+): Promise<ChatResult> {
+  const match = input.match(
+    /(?:find|search)\s+(?:file\s+)?(.+?)(?:\s+in\s+(.+))?$/i,
+  );
+  const query = match?.[1]?.trim();
+  const root = match?.[2]?.trim();
+
+  if (!query) return text("Please specify a filename or query to find.");
+
+  const results = await findFiles(query, { root });
+
+  if (results.length === 0) {
+    const context = root ? ` in "${root}"` : "";
+    return text(`[FILES] No files found matching "${query}"${context}`);
+  }
+
+  const list = results
+    .map((f, i) => {
+      const score = (f.similarity * 100).toFixed(1);
+      return `${i + 1}. ${f.name}\n   Path: ${f.path}\n   Size: ${formatSize(f.size)}\n   Similarity: ${score}%`;
+    })
+    .join("\n\n");
+
+  const count = results.length;
+  const unit = count === 1 ? "FILE" : "FILES";
+  return text(`[FOUND ${count} ${unit}]\n\n${list}`);
 }

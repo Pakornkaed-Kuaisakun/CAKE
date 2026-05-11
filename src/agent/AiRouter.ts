@@ -6,7 +6,6 @@ export async function aiIntentRouter(
   input: string,
   model?: string,
 ): Promise<string> {
-  // บังคับใช้โมเดลตัวเล็กเพื่อความเร็ว
   const fastModel = model || getFastModel(provider.name);
 
   const prompt = `

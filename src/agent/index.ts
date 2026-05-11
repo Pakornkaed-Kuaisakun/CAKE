@@ -18,6 +18,7 @@ export interface AgentResponse {
 
 // Intents that return live data and must never be cached
 const UNCACHEABLE_INTENTS = new Set([
+  "chat",
   "email",
   "news",
   "weather",
@@ -92,6 +93,7 @@ export class CakeAgent {
       // Only cache structural/static commands — detect by checking intent keywords
       const lowerInput = input.toLowerCase();
       const isLive = [
+        "chat",
         "email",
         "news",
         "weather",

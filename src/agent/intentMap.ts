@@ -9,6 +9,7 @@ export type Handler = (
 ) => Promise<ChatResult>;
 
 export const intentMap: Record<string, Handler> = {
+  chat: H.handleChat,
   email: H.handleEmail,
   email_send: H.handleSendEmail,
   news: H.handleNews,
@@ -28,6 +29,7 @@ export const intentMap: Record<string, Handler> = {
   file_read: H.handleFileRead,
   file_summarize: H.handleFileSummarize,
   file_compose: H.handleFileCompose,
+  file_find: H.handleFindFile,
   search: H.handleSearch,
   memory_index: H.handleIndexDocument,
   cron_list: H.handleListCron,
@@ -41,4 +43,5 @@ export const intentMap: Record<string, Handler> = {
   export: H.handleExport,
   save: H.handleExport,
   write: H.handleExport,
+  security_scan: H.handleSecurityScan,
 };
