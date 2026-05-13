@@ -53,7 +53,10 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "file_read <path>", description: "Read a file" },
   { command: "file_summarize <path>", description: "Summarize a file" },
   { command: "file_compose <path>", description: "Compose a file" },
-  { command: "file_find <query> [in <path>]", description: "Find files by name or fuzzy search" },
+  {
+    command: "file_find <query> [in <path>]",
+    description: "Find files by name or fuzzy search",
+  },
   { command: "search <query>", description: "Search the web for information" },
   {
     command: "memory_index <path>",
@@ -68,7 +71,7 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Get weather report (from IP geolocation)",
   },
   {
-    command: "scan <directory>",
+    command: "scan <directory> <WARNING: Beta version>",
     description: "Perform security scan for malware or suspicious patterns",
   },
 

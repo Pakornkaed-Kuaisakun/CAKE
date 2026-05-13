@@ -8,15 +8,29 @@ export type Handler = (
 ) => Promise<ChatResult>;
 
 interface Route {
-  /** One or more patterns to test against lowercased input */
   patterns: RegExp[];
   handler: Handler;
 }
 
+// ─── Fast-path: greetings and simple chat bypass ALL routing ────────────────
+// These never need an LLM router call — just go straight to handleChat.
+const CHAT_FAST_RE =
+  /^(hi|hey|hello|yo|howdy|sup|what'?s up|good\s*(morning|afternoon|evening|night)|thanks?|thank you|ok|okay|sure|got it|bye|goodbye|see you|cya)[\s!?.]*$/i;
+
+export function isChatFastPath(input: string): boolean {
+  return CHAT_FAST_RE.test(input.trim());
+}
+
 export const ROUTES: Route[] = [
   // Email
-  { patterns: [/\b(my emails|inbox|mail)\b/, /^email$/], handler: H.handleEmail },
-  { patterns: [/\b(send email|write email|compose email)\b/, /^email_send\b/], handler: H.handleSendEmail },
+  {
+    patterns: [/\b(my emails|inbox|mail)\b/, /^email$/],
+    handler: H.handleEmail,
+  },
+  {
+    patterns: [/\b(send email|write email|compose email)\b/, /^email_send\b/],
+    handler: H.handleSendEmail,
+  },
 
   // News
   {
@@ -24,7 +38,7 @@ export const ROUTES: Route[] = [
     handler: H.handleNews,
   },
 
-  // Calendar — create (ต้องมาก่อน)
+  // Calendar — create (must come before list)
   {
     patterns: [
       /\b(add|create|set|schedule)\b.*\b(event|meeting|appointment)\b/,
@@ -34,15 +48,15 @@ export const ROUTES: Route[] = [
 
   // Calendar — list
   {
-    patterns: [/\b(calendar_list|schedule_list|upcoming_list|events?)\b/, /^calendar_list$/],
+    patterns: [
+      /\b(calendar_list|schedule_list|upcoming_list|events?)\b/,
+      /^calendar_list$/,
+    ],
     handler: H.handleCalendarList,
   },
 
   // Calendar - remove
-  {
-    patterns: [/^calendar_remove\b/],
-    handler: H.handleCalendarRemove,
-  },
+  { patterns: [/^calendar_remove\b/], handler: H.handleCalendarRemove },
 
   // Todos — add
   {
@@ -62,10 +76,7 @@ export const ROUTES: Route[] = [
 
   // Todos — remove
   {
-    patterns: [
-      /\b(remove|delete)\b.*\b(todo|task)\b/i,
-      /^todo_remove\b/,
-    ],
+    patterns: [/\b(remove|delete)\b.*\b(todo|task)\b/i, /^todo_remove\b/],
     handler: H.handleTodoRemove,
   },
 
@@ -96,7 +107,7 @@ export const ROUTES: Route[] = [
     handler: H.handleReadDocument,
   },
 
-  // Document - ask
+  // Document — ask
   {
     patterns: [/\b(ask|question)\b.*\.(pdf|docx|txt)\b/i],
     handler: H.handleAskDocument,
@@ -104,17 +115,21 @@ export const ROUTES: Route[] = [
 
   // File — list
   {
-    patterns: [/^ls\b/, /\b(list|dir)\b.*\b(file|folder|directory)\b/, /^file_list\b/],
+    patterns: [
+      /^ls\b/,
+      /\b(list|dir)\b.*\b(file|folder|directory)\b/,
+      /^file_list\b/,
+    ],
     handler: H.handleFileList,
   },
 
-  // File - create directory tree
+  // File — directory tree
   {
     patterns: [
-      /^tree(\s+.+)?$/, // tree หรือ tree src
-      /^ls\s+tree(\s+.+)?$/, // ls tree src
-      /\b(show|list|print)\b.*\b(tree|structure)\b/, // show tree structure
-      /\b(tree|structure)\b.*\b(project|folder|directory)\b/, // tree project
+      /^tree(\s+.+)?$/,
+      /^ls\s+tree(\s+.+)?$/,
+      /\b(show|list|print)\b.*\b(tree|structure)\b/,
+      /\b(tree|structure)\b.*\b(project|folder|directory)\b/,
     ],
     handler: H.handleDirectoryTree,
   },
@@ -147,11 +162,12 @@ export const ROUTES: Route[] = [
     handler: H.handleFindFile,
   },
 
-  // Search
-  {
-    patterns: [/\b(search|find|what is|who is|look up|google)\b/],
-    handler: H.handleSearch,
-  },
+  // ⚠️  REMOVED the over-broad search pattern:
+  //   /\b(search|find|what is|who is|look up|google)\b/
+  // This was matching almost EVERY conversational input ("what is..." = chat)
+  // and forcing an unnecessary LLM intent-routing call.
+  // Explicit "search <query>" commands still work via intentMap.
+  { patterns: [/^(search|look up|google)\s+/i], handler: H.handleSearch },
 
   // Diagnose
   {
@@ -184,15 +200,13 @@ export const ROUTES: Route[] = [
     patterns: [/\b(schedule|every|remind me to)\b/i],
     handler: H.handleScheduleTask,
   },
+
+  // Notify
   {
     patterns: [/\b(test notify|test notification)\b/i],
     handler: H.handleTestNotify,
   },
-  {
-    patterns: [/\b(notify|remind|alert)\b\s+.+/i],
-
-    handler: H.handleNotify,
-  },
+  { patterns: [/\b(notify|remind|alert)\b\s+.+/i], handler: H.handleNotify },
 
   // Finance
   {
@@ -201,17 +215,17 @@ export const ROUTES: Route[] = [
   },
 
   // Weather
-  {
-    patterns: [/\b(weather)\b/i],
-    handler: H.handleWeather,
-  },
+  { patterns: [/\b(weather)\b/i], handler: H.handleWeather },
 
+  // Export
   {
     patterns: [
       /^(export|save|write)\s+(txt|md|json|csv|html|text|markdown)\b/i,
     ],
     handler: H.handleExport,
   },
+
+  // Security
   {
     patterns: [/\b(security|scan|virus|malware)\b/i],
     handler: H.handleSecurityScan,

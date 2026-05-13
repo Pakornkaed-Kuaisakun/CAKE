@@ -16,7 +16,6 @@ export interface ChatOptions {
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
-  /** Estimated cost in USD. null for local models. */
   costUsd: number | null;
 }
 
@@ -25,10 +24,18 @@ export interface ChatResult {
   usage?: TokenUsage;
 }
 
+/** Callback invoked with each new text chunk as it arrives from the model. */
+export type StreamChunkCallback = (chunk: string) => void;
+
 export interface AIProvider {
   name: ProviderName;
   chat(messages: Message[], options?: ChatOptions): Promise<ChatResult>;
+  /** Stream response chunks. Falls back to chat() if not implemented. */
+  stream?(
+    messages: Message[],
+    options: ChatOptions,
+    onChunk: StreamChunkCallback,
+  ): Promise<ChatResult>;
   embed?(text: string, model?: string): Promise<number[]>;
   listModels?(): Promise<string[]>;
 }
-

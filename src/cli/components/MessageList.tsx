@@ -35,7 +35,9 @@ function UserMessage({ content }: { content: string }) {
       <Text color={theme.primary} bold>
         You ›{" "}
       </Text>
-      <Text color={theme.text} wrap='wrap'>{content}</Text>
+      <Text color={theme.text} wrap='wrap'>
+        {content}
+      </Text>
     </Box>
   );
 }

@@ -34,7 +34,7 @@ export function App() {
   const hasUsage = stats.totalInputTokens > 0 || stats.totalOutputTokens > 0;
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection='column'>
       <Header provider={providerName} model={model} />
 
       <MessageList messages={messages} version={msgVersion} />
@@ -42,12 +42,12 @@ export function App() {
       {/* ── Thinking indicator ── */}
       {loading && (
         <Box marginBottom={1} gap={1}>
-          <Text color="cyan">
-            <Spinner type="dots" />
+          <Text color='cyan'>
+            <Spinner type='dots' />
           </Text>
-          <Text color="cyan">Thinking…</Text>
+          <Text color='cyan'>Thinking…</Text>
           {thinkingMs !== null && (
-            <Text color="gray">{formatMs(thinkingMs)}</Text>
+            <Text color='gray'>{formatMs(thinkingMs)}</Text>
           )}
         </Box>
       )}
@@ -62,11 +62,11 @@ export function App() {
       {/* ── Session token/cost footer ── */}
       {hasUsage && (
         <Box marginTop={1} gap={2}>
-          <Text color="gray">
+          <Text color='gray'>
             Tokens: {stats.totalInputTokens}↑ {stats.totalOutputTokens}↓
           </Text>
           {stats.totalCostUsd > 0 && (
-            <Text color="gray">
+            <Text color='gray'>
               Session cost: {formatCost(stats.totalCostUsd)}
             </Text>
           )}
