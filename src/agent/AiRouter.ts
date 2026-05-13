@@ -42,6 +42,7 @@ export async function aiIntentRouter(
     - finance
     - weather
     - export
+    - bash (Running a shell/terminal command, e.g. "run ls", "bash echo hi", "$ pwd")
 
     GUIDELINES:
     1. If the user is just saying hello, asking who you are, or asking about your models/settings, use "chat".

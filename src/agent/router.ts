@@ -230,6 +230,15 @@ export const ROUTES: Route[] = [
     patterns: [/\b(security|scan|virus|malware)\b/i],
     handler: H.handleSecurityScan,
   },
+
+  // Bash / Shell
+  {
+    patterns: [
+      /^(bash|run|shell)\s+.+/i,
+      /^\$\s+.+/, // $ ls -la style
+    ],
+    handler: H.handleBash,
+  },
 ];
 
 /**

@@ -44,4 +44,7 @@ export const intentMap: Record<string, Handler> = {
   save: H.handleExport,
   write: H.handleExport,
   security_scan: H.handleSecurityScan,
+  bash: H.handleBash,
+  run: H.handleBash,
+  shell: H.handleBash,
 };

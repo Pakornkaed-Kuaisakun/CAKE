@@ -155,6 +155,10 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "cron_list | export json cron-jobs.json",
     description: "Export cron jobs to JSON",
   },
+  {
+    command: "bash <command>",
+    description: "Run a shell command and see its output",
+  },
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },

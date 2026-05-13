@@ -239,23 +239,15 @@ export function useAgent() {
             agent.clearHistory();
             return;
           case "reboost": {
-            setLoading(true);
-            try {
-              setAgent(buildAgent(providerName, model));
-              setMsgVersion((v) => v + 1);
-              setMessages([
-                {
-                  id: makeId(),
-                  role: "system",
-                  content: "🚀 System reboosted. Agent re-initialized.",
-                },
-              ]);
-            } catch (err: any) {
-              addMsg("system", `Reboost failed: ${err.message}`);
-            } finally {
-              setLoading(false);
-            }
-            return;
+            process.stdout.write("\x1Bc");
+            const { spawn } = await import("child_process");
+            spawn("npm", ["run", "dev"], {
+              detached: true,
+              stdio: "inherit",
+              cwd: process.cwd(),
+              shell: process.platform === "win32", // needed on Windows
+            }).unref();
+            process.exit(0);
           }
           case "provider": {
             const name = args[0] as ProviderName;

@@ -37,6 +37,7 @@ const UNCACHEABLE_INTENTS = new Set([
   "cron_list",
   "finance",
   "search",
+  "bash",
 ]);
 
 export class CakeAgent {

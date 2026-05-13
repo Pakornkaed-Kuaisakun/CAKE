@@ -62,6 +62,9 @@ const TOOL_PREFIXES = new Set([
   "cron_schedule",
   "cron_remove",
   "test_notify",
+  "bash",
+  "run",
+  "shell",
 ]);
 
 const TOOL_PATTERNS: RegExp[] = [
@@ -74,6 +77,7 @@ const TOOL_PATTERNS: RegExp[] = [
   /\bsend\s+(an?\s+)?email\b/i,
   /\b(add|create|new)\s+(task|todo|event|meeting)\b/i,
   /\b(show|list|view)\s+my\s+(email|todo|task|calendar|event|schedule)\b/i,
+  /^\$\s+\S+/, // $ command style
 ];
 
 const CHAT_PATTERNS: RegExp[] = [
