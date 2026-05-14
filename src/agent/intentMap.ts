@@ -47,4 +47,9 @@ export const intentMap: Record<string, Handler> = {
   bash: H.handleBash,
   run: H.handleBash,
   shell: H.handleBash,
+
+  //Autonomous
+  auto: H.handleAutonomous,
+  agent: H.handleAutonomous,
+  autonomous: H.handleAutonomous,
 };

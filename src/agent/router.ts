@@ -239,6 +239,12 @@ export const ROUTES: Route[] = [
     ],
     handler: H.handleBash,
   },
+
+  // Autonomous Agent
+  {
+    patterns: [/^(run\s+)?(auto|agent|autonomous)\s+/i],
+    handler: H.handleAutonomous,
+  },
 ];
 
 /**

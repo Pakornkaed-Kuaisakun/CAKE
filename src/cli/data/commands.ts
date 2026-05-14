@@ -159,6 +159,22 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "bash <command>",
     description: "Run a shell command and see its output",
   },
+  {
+    command: "auto <goal>",
+    description: "Autonomous agent: plans & executes multi-step tasks",
+  },
+  {
+    command: "agent <goal>",
+    description: "Alias for auto — run autonomous agent",
+  },
+  {
+    command: "auto research <topic> and save report to md",
+    description: "Research + export pipeline via agent",
+  },
+  {
+    command: "auto check my emails summarize and add todos",
+    description: "Multi-tool autonomous workflow",
+  },
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },

@@ -15,3 +15,4 @@ export * from "./export.js";
 export * from "./security.js";
 export * from "./chat.js";
 export * from "./bash.js";
+export * from "./autonomous.js";

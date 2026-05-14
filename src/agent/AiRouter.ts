@@ -43,6 +43,8 @@ export async function aiIntentRouter(
     - weather
     - export
     - bash (Running a shell/terminal command, e.g. "run ls", "bash echo hi", "$ pwd")
+    - autonomous (Running a multi-step autonomous agent to accomplish a goal,
+                e.g. "auto research X and save report", "agent do X")
 
     GUIDELINES:
     1. If the user is just saying hello, asking who you are, or asking about your models/settings, use "chat".

@@ -38,6 +38,9 @@ const UNCACHEABLE_INTENTS = new Set([
   "finance",
   "search",
   "bash",
+  "auto",
+  "agent",
+  "autonomous",
 ]);
 
 export class CakeAgent {

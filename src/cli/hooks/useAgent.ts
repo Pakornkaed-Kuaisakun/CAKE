@@ -165,6 +165,7 @@ export function useAgent() {
       if (!trimmed) return;
       setInput("");
       const lower = trimmed.toLowerCase();
+      const t0 = Date.now();
 
       if (lower === "cls" || lower === "clear") {
         setMsgVersion((v) => v + 1);
@@ -410,6 +411,53 @@ export function useAgent() {
             }
             return;
           }
+
+          case "agent": {
+            if (!args.length) {
+              addMsg("system", "Usage: /agent <goal>");
+              return;
+            }
+            const goal = args.join(" ");
+            // Route through the normal agent.run so streaming works
+            addMsg("user", `auto ${goal}`);
+            setLoading(true);
+            startTimer();
+            const controller = new AbortController();
+            abortControllerRef.current = controller;
+            const streamId = makeId();
+            streamingIdRef.current = streamId;
+            setMessages((prev) => [
+              ...prev,
+              { id: streamId, role: "assistant", content: "" },
+            ]);
+            try {
+              const resp = await agent.run(`auto ${goal}`, {
+                signal: controller.signal,
+              });
+              const finalTime = Date.now() - t0;
+              stopTimer();
+              accumulateUsage(resp.usage);
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === streamId
+                    ? { ...m, content: resp.text, thinkingTime: finalTime }
+                    : m,
+                ),
+              );
+            } catch (err: any) {
+              stopTimer();
+              setMessages((prev) => prev.filter((m) => m.id !== streamId));
+              if (!err.message?.includes("abort"))
+                addMsg("system", `Agent error: ${err.message}`);
+            } finally {
+              setLoading(false);
+              setThinkingMs(null);
+              abortControllerRef.current = null;
+              streamingIdRef.current = null;
+            }
+            return;
+          }
+
           default:
             addMsg("system", `Unknown command: ${trimmed}. Type /help.`);
             return;
@@ -419,7 +467,6 @@ export function useAgent() {
       // ── Agent call with streaming ─────────────────────────────────────────
       addMsg("user", trimmed);
       setLoading(true);
-      const t0 = Date.now();
       startTimer();
 
       const controller = new AbortController();

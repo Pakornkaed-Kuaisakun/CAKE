@@ -65,6 +65,9 @@ const TOOL_PREFIXES = new Set([
   "bash",
   "run",
   "shell",
+  "auto",
+  "agent",
+  "autonomous",
 ]);
 
 const TOOL_PATTERNS: RegExp[] = [
