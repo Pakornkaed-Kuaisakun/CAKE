@@ -75,7 +75,14 @@ export async function executeAutonomous(
     let stepSuccess = true;
 
     if (!runner) {
-      output = `Unknown tool: "${tool}". Available: search, bash, file_read, chat, finish, etc.`;
+      // Give the planner a targeted hint so it corrects itself next step
+      const hint =
+        tool === "write_file" || tool === "save"
+          ? `Unknown tool "${tool}". To save a file use: export md filename.md|<content>`
+          : tool === "file_save" || tool === "file_write"
+          ? `Unknown tool "${tool}". Use: export md filename.md|<content> to save files.`
+          : `Unknown tool "${tool}". Valid tools: search, bash, file_read, file_summarize, export, chat, finish, and others listed in AVAILABLE TOOLS.`;
+      output = hint;
       stepSuccess = false;
     } else {
       try {

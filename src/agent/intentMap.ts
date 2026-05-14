@@ -1,5 +1,4 @@
 import * as H from "./handlers/index.js";
-
 import type { AIProvider, ChatResult } from "../providers/types.js";
 
 export type Handler = (
@@ -9,47 +8,69 @@ export type Handler = (
 ) => Promise<ChatResult>;
 
 export const intentMap: Record<string, Handler> = {
+  // ── Core chat ──────────────────────────────────────────────────────────────
   chat: H.handleChat,
+
+  // ── Email ──────────────────────────────────────────────────────────────────
   email: H.handleEmail,
   email_send: H.handleSendEmail,
+
+  // ── News ───────────────────────────────────────────────────────────────────
   news: H.handleNews,
+
+  // ── Calendar ───────────────────────────────────────────────────────────────
   calendar_list: H.handleCalendarList,
   calendar_create: H.handleCalendarCreate,
   calendar_remove: H.handleCalendarRemove,
+
+  // ── Todos ──────────────────────────────────────────────────────────────────
   todo_list: H.handleTodoList,
   todo_add: H.handleTodoAdd,
   todo_remove: H.handleTodoRemove,
   todo_remove_all: H.handleTodoRemoveAll,
   plan: H.handlePlan,
+
+  // ── Files ──────────────────────────────────────────────────────────────────
   file_list: H.handleFileList,
-  directory_tree: H.handleDirectoryTree,
-  document_read: H.handleReadDocument,
-  document_summarize: H.handleSummarizeDocument,
-  document_ask: H.handleAskDocument,
   file_read: H.handleFileRead,
   file_summarize: H.handleFileSummarize,
   file_compose: H.handleFileCompose,
   file_find: H.handleFindFile,
-  search: H.handleSearch,
+  directory_tree: H.handleDirectoryTree,
+
+  // ── Documents ──────────────────────────────────────────────────────────────
+  document_read: H.handleReadDocument,
+  document_summarize: H.handleSummarizeDocument,
+  document_ask: H.handleAskDocument,
   memory_index: H.handleIndexDocument,
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+  search: H.handleSearch,
+
+  // ── Cron ───────────────────────────────────────────────────────────────────
   cron_list: H.handleListCron,
   cron_schedule: H.handleScheduleTask,
   cron_remove: H.handleRemoveCron,
+
+  // ── Notifications ──────────────────────────────────────────────────────────
   notify: H.handleNotify,
   test_notify: H.handleTestNotify,
+
+  // ── Finance / Weather ──────────────────────────────────────────────────────
   finance: H.handleFinanceReport,
   weather: H.handleWeather,
-  // Sink — also reachable as a standalone intent
-  export: H.handleExport,
-  save: H.handleExport,
-  write: H.handleExport,
-  security_scan: H.handleSecurityScan,
-  bash: H.handleBash,
-  run: H.handleBash,
-  shell: H.handleBash,
 
-  //Autonomous
-  auto: H.handleAutonomous,
-  agent: H.handleAutonomous,
+  // ── Export ─────────────────────────────────────────────────────────────────
+  export: H.handleExport,
+
+  // ── System ─────────────────────────────────────────────────────────────────
+  security_scan: H.handleSecurityScan,
+  diagnose: H.handleDiagnoseSystem,
+  performance: H.handleDiagnosePerformance,
+
+  // ── Shell ──────────────────────────────────────────────────────────────────
+  bash: H.handleBash,
+
+  // ── Autonomous Agent ───────────────────────────────────────────────────────
   autonomous: H.handleAutonomous,
 };

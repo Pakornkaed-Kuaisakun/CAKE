@@ -130,7 +130,11 @@ export async function exportSink(
 
 /**
  * Standalone handler for the router (so "export …" also works without a pipe).
- * Reads the __pipe__ block from input if present.
+ *
+ * Supported input formats:
+ *   1. Pipeline: "export md report.md__pipe__:<content>"  — from the | pipeline executor
+ *   2. Inline:   "export md report.md|<content>"          — used by the autonomous agent
+ *   3. No content: returns usage message
  */
 export async function handleExport(
   _provider: AIProvider,
@@ -140,17 +144,29 @@ export async function handleExport(
   // Strip the "export" verb, keep the rest
   const withoutVerb = input.replace(/^export\s+/i, "").trim();
 
-  // Check for piped content embedded in the input
+  // ── 1) Pipeline marker (__pipe__:) ─────────────────────────────────────────
   const pipeMarker = "__pipe__:";
   const pipeIdx = withoutVerb.indexOf(pipeMarker);
-
   if (pipeIdx !== -1) {
     const rawArgs = withoutVerb.slice(0, pipeIdx).trim();
     const content = withoutVerb.slice(pipeIdx + pipeMarker.length).trim();
     return exportSink(content, "export", rawArgs);
   }
 
+  // ── 2) Inline content via | separator (autonomous agent style) ─────────────
+  // Format: "<format> <filename>|<content>"
+  // e.g.  "md report.md|# Title\n\ncontent here"
+  const inlineIdx = withoutVerb.indexOf("|");
+  if (inlineIdx !== -1) {
+    const rawArgs = withoutVerb.slice(0, inlineIdx).trim();  // "md report.md"
+    const content = withoutVerb.slice(inlineIdx + 1);        // everything after |
+    if (content.trim()) {
+      return exportSink(content, "export", rawArgs);
+    }
+  }
+
+  // ── 3) No content ──────────────────────────────────────────────────────────
   return {
-    text: "Usage: export <format> [filename]\nFormats: txt, md, json, csv, html\nExample: directory_tree src | export txt tree.txt",
+    text: "Usage: export <format> [filename]|<content>\nFormats: txt, md, json, csv, html\nExamples:\n  directory_tree src | export txt tree.txt\n  export md report.md|# My Report\\n\\nContent here...",
   };
 }

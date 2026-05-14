@@ -3,49 +3,30 @@
  *
  * Zero-latency pre-classifier. Runs before the AI intent router.
  * Returns "chat", "tool", or "ambiguous" with no LLM call.
+ *
+ * DESIGN NOTES
+ * ────────────────────────────────────────────────────────────────────────────
+ * TOOL_PREFIXES  — unambiguous CLI command words that can ONLY start tool
+ *                  requests (snake_case intents + clear action nouns).
+ *                  Do NOT add everyday English verbs here (read / ask / write /
+ *                  find / search / summarize …) because they also appear in
+ *                  conversational sentences → false-positive "tool", then
+ *                  matchRoute() fails, and we fall through to aiIntentRouter
+ *                  wasting a full LLM call.
+ *
+ * TOOL_PATTERNS  — regex patterns that are precise enough to distinguish a
+ *                  real tool trigger from a chat sentence even when the verb
+ *                  is shared (e.g. file extension, time expression, $TICKER).
+ *
+ * CHAT_PATTERNS  — patterns that conclusively identify conversational input
+ *                  so they can skip the router entirely.
  */
 
+// ── Unambiguous command-word prefixes ─────────────────────────────────────
+// Only words that would NEVER start a conversational sentence.
 const TOOL_PREFIXES = new Set([
-  "email",
+  // Explicit snake_case intent IDs (safe: no natural-language overlap)
   "email_send",
-  "news",
-  "calendar",
-  "todo",
-  "plan",
-  "file",
-  "ls",
-  "cat",
-  "tree",
-  "find",
-  "search",
-  "look up",
-  "google",
-  "document",
-  "summarize",
-  "summary",
-  "read",
-  "open",
-  "ask",
-  "schedule",
-  "cron",
-  "remind",
-  "notify",
-  "alert",
-  "finance",
-  "stock",
-  "weather",
-  "export",
-  "save",
-  "write",
-  "scan",
-  "security",
-  "diagnose",
-  "diagnosis",
-  "performance",
-  "index",
-  "learn",
-  "remember",
-  "memory",
   "directory_tree",
   "file_list",
   "file_read",
@@ -55,44 +36,109 @@ const TOOL_PREFIXES = new Set([
   "todo_list",
   "todo_add",
   "todo_remove",
+  "todo_remove_all",
   "calendar_list",
   "calendar_create",
   "calendar_remove",
   "cron_list",
   "cron_schedule",
   "cron_remove",
+  "document_read",
+  "document_summarize",
+  "document_ask",
   "test_notify",
+  "memory_index",
+  // Short unambiguous CLI words
+  "ls",
+  "cat",
+  "tree",  // UNIX command
   "bash",
-  "run",
   "shell",
+  "news",
+  "weather",
+  "finance",
+  "cron",
   "auto",
   "agent",
   "autonomous",
+  // Prefixes with no conversational meaning on their own
+  "diagnose",
+  "diagnosis",
 ]);
 
+// ── Regex-based tool signals (precise enough to override ambiguity) ────────
 const TOOL_PATTERNS: RegExp[] = [
+  // File extensions → must be a file operation
   /\.(pdf|docx|txt|csv|json|md|js|ts|py|sh|exe|zip)\b/i,
-  /\bevery\s+(day|hour|week|monday|morning|night)\b/i,
+  // Time/schedule expressions
+  /\bevery\s+(day|hour|week|monday|tuesday|wednesday|thursday|friday|saturday|sunday|morning|night)\b/i,
   /\bremind me (to|at|every)\b/i,
   /\bat \d{1,2}(:\d{2})?\s*(am|pm)\b/i,
+  // Finance
   /\$[A-Z]{1,5}\b/,
   /\b[A-Z]{2,5}:\s/,
+  // Explicit send-email phrasing
   /\bsend\s+(an?\s+)?email\b/i,
-  /\b(add|create|new)\s+(task|todo|event|meeting)\b/i,
+  // Task/event creation with object noun
+  /\b(add|create|new)\s+(task|todo|event|meeting|appointment)\b/i,
+  // Listing owned items
   /\b(show|list|view)\s+my\s+(email|todo|task|calendar|event|schedule)\b/i,
-  /^\$\s+\S+/, // $ command style
+  // Shell prefix  $ command
+  /^\$\s+\S+/,
+  // "bash …", "run ls …", "shell echo …"
+  /^(bash|run|shell)\s+\S/i,
+  // Autonomous agent prefix
+  /^(auto|agent|autonomous)\s+/i,
+  // Explicit file/document commands with path-like argument
+  /\b(read|open|show|cat)\s+["']?[\w./\\-]+\.[a-z]{1,5}\b/i,
+  /\b(summarize|summary of)\s+["']?[\w./\\-]+\.[a-z]{1,5}\b/i,
+  /\b(find|search)\s+(file|folder|directory)\b/i,
+  // Notify with message body
+  /\b(notify|remind|alert)\s+.{3,}/i,
+  // Stock / financial report
+  /\b(stock|financial report|finance report)\b/i,
+  // Security scan
+  /\b(security scan|virus scan|malware scan|scan for)\b/i,
+  // Export / save with format
+  /^(export|save|write)\s+(txt|md|json|csv|html|text|markdown)\b/i,
 ];
 
+// ── Conversational patterns that definitively mean chat ───────────────────
 const CHAT_PATTERNS: RegExp[] = [
-  /^(what|who|where|when|why|how)\s+(is|are|was|were|do|does|did|can|could|would|should)\b/i,
-  /^(tell me|explain|describe|define|what'?s)\b/i,
-  /^(do you|are you|can you|could you|would you|will you)\b/i,
-  /\b(difference between|compare|vs\.?|versus)\b/i,
-  /^help me\b/i,
-  /^i (need|want|think|feel|believe|wonder|don'?t)\b/i,
+  // Question words followed by auxiliary verbs
+  /^(what|who|where|when|why|how)\s+(is|are|was|were|do|does|did|can|could|would|should|will)\b/i,
+  // Instructional openers
+  /^(tell me|explain|describe|define|what'?s|elaborate)\b/i,
+  // Direct questions to the AI
+  /^(do you|are you|can you|could you|would you|will you|have you)\b/i,
+  // Comparative / conceptual
+  /\b(difference between|compare|vs\.?|versus|pros and cons|trade.?off)\b/i,
+  // Help phrasing
+  /^help me (understand|learn|figure|think|decide|write|know)\b/i,
+  // First-person statements
+  /^i (need|want|think|feel|believe|wonder|don'?t|am|was|have|had|would|could)\b/i,
+  // Ends in question mark (natural language question)
   /\?$/,
+  // "How do I / How to" style
   /^how (do i|does|to|can i)\b/i,
-  /^give me (an? )?(example|idea|tip|summary|overview|explanation)\b/i,
+  // "Give me an example/idea…"
+  /^give me (an? )?(example|idea|tip|summary|overview|explanation|list of)\b/i,
+  // Greetings (belt-and-suspenders with isChatFastPath)
+  /^(hi|hey|hello|yo|howdy|sup|thanks?|thank you|ok(ay)?)\b/i,
+  // Opinion / preference questions
+  /^(which|should i|is it (better|good|bad|safe|worth)|what('?s| is) (the best|a good|better))\b/i,
+  // "Write me a poem / joke / story" → conversational generation, not file compose
+  /^write (me|a|an)\s+(poem|joke|story|song|haiku|essay|letter|message|email draft)\b/i,
+  // "Read me a …" → spoken-word request, not file read
+  /^read me\b/i,
+  // "Find out / Find a way" → conversational, not file find
+  /^find (out|a way|the|an)\b/i,
+  // "Ask yourself / ask the AI" → conversational
+  /^ask (yourself|the|me|him|her|them)\b/i,
+  // "Remember when / remember that" → conversational
+  /^remember (when|that|if|how|the)\b/i,
+  // "Search for an answer" vs "search <query>" caught by TOOL_PATTERNS
+  /^search (for an?|the internet for|online for)\b/i,
 ];
 
 export type PreClassification = "chat" | "tool" | "ambiguous";
@@ -102,13 +148,21 @@ export function preClassify(input: string): PreClassification {
   const lower = trimmed.toLowerCase();
   const firstWord = lower.split(/\s+/)[0];
 
+  // 1. Exact first-word match against unambiguous CLI command words
   if (TOOL_PREFIXES.has(firstWord)) return "tool";
-  for (const p of TOOL_PATTERNS) if (p.test(trimmed)) return "tool";
+
+  // 2. CHAT patterns first — intercept conversational inputs before tool patterns
+  //    (important: some CHAT_PATTERNS start with words that also appear in
+  //    TOOL_PATTERNS, e.g. "write me a poem" vs "write file foo.md")
   for (const p of CHAT_PATTERNS) if (p.test(trimmed)) return "chat";
 
-  if (trimmed.length < 60 && !/[/\\]/.test(trimmed)) {
+  // 3. Precise regex-based tool signals
+  for (const p of TOOL_PATTERNS) if (p.test(trimmed)) return "tool";
+
+  // 4. Short inputs with no command verb → probably chat
+  if (trimmed.length < 60 && !/[\/\\]/.test(trimmed)) {
     const hasCommandVerb =
-      /^(get|fetch|show|list|create|add|remove|delete|send|read|open|run|execute|scan|check|generate|make|build|compose|write|export|save|find|search|schedule|summarize|index)\b/i.test(
+      /^(get|fetch|show|list|create|add|remove|delete|send|read|open|run|execute|scan|check|generate|make|build|compose|write|export|save|find|search|schedule|summarize|index|notify|remind|alert|diagnose|deploy|install)\b/i.test(
         trimmed,
       );
     if (!hasCommandVerb) return "chat";

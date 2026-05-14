@@ -175,9 +175,12 @@ export const ROUTES: Route[] = [
     handler: H.handleDiagnoseSystem,
   },
 
-  // Performance
+  // Performance — require explicit CLI-style trigger, not casual "this is slow"
   {
-    patterns: [/\b(performance|perf|speed|slow)\b/i],
+    patterns: [
+      /\b(performance check|perf check|system performance|how fast)\b/i,
+      /^performance\b|^perf\b/i,
+    ],
     handler: H.handleDiagnosePerformance,
   },
 
@@ -189,15 +192,22 @@ export const ROUTES: Route[] = [
 
   // Cron / Scheduling
   {
-    patterns: [/\b(list|show)\b.*\b(cron|job|schedule)s?\b/i],
+    patterns: [/\b(list|show)\b.*\b(cron|job|schedule)s?\b/i, /^cron_list$/],
     handler: H.handleListCron,
   },
   {
-    patterns: [/\b(remove|delete|cancel)\b.*\b(job|task|cron)\b/i],
+    // Must mention cron/job/schedule explicitly to avoid shadowing todo_remove
+    patterns: [/\b(remove|delete|cancel)\b.*\b(cron|scheduled\s+job|cron\s+job)\b/i, /^cron_remove\b/],
     handler: H.handleRemoveCron,
   },
   {
-    patterns: [/\b(schedule|every|remind me to)\b/i],
+    // Scheduling: time-based trigger words — needs a time or recurrence to fire
+    patterns: [
+      /\bevery\s+(day|hour|week|\w+day|morning|night)\b/i,
+      /\bremind me to\b/i,
+      /\bat \d{1,2}(:\d{2})?\s*(am|pm)\b.*\b(every|daily|weekly)\b/i,
+      /^cron_schedule\b/,
+    ],
     handler: H.handleScheduleTask,
   },
 
@@ -208,9 +218,13 @@ export const ROUTES: Route[] = [
   },
   { patterns: [/\b(notify|remind|alert)\b\s+.+/i], handler: H.handleNotify },
 
-  // Finance
+  // Finance — require a ticker pattern or explicit finance/stock keywords
   {
-    patterns: [/\b(finance|financial|stock|market)\b/i],
+    patterns: [
+      /\b(finance|financial report|stock price|stock report)\b/i,
+      /\$[A-Z]{1,5}\b/,          // $AAPL style
+      /^finance\b/i,
+    ],
     handler: H.handleFinanceReport,
   },
 
@@ -225,9 +239,13 @@ export const ROUTES: Route[] = [
     handler: H.handleExport,
   },
 
-  // Security
+  // Security — require compound term to avoid matching "security" in conversation
   {
-    patterns: [/\b(security|scan|virus|malware)\b/i],
+    patterns: [
+      /\b(security scan|virus scan|malware scan|scan for (virus|malware|threats?))\b/i,
+      /^security_scan\b/,
+      /^scan\s+.+/i,
+    ],
     handler: H.handleSecurityScan,
   },
 

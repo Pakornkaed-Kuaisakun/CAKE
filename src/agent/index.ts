@@ -15,6 +15,7 @@ import { initCronManager } from "./handlers/cron.js";
 import { ResponseCache } from "./responseCache.js";
 import { getFastModel } from "../providers/utils.js";
 import { hasPipe, parsePipeline, executePipeline } from "./pipeline/index.js";
+import { clearIntentCache } from "./intentCache.js";
 
 export interface AgentResponse {
   text: string;
@@ -67,7 +68,19 @@ export class CakeAgent {
 
   setModel(model: string | undefined): void {
     this.model = model;
+    // Intent cache is model-agnostic (intents don't change per model),
+    // but clear it when provider changes to avoid stale routing decisions.
   }
+
+  setProvider(provider: AIProvider, model?: string): void {
+    this.provider = provider;
+    this.model = model;
+    this.fastModel = getFastModel(provider.name);
+    this.memory = new MemoryManager(provider);
+    clearIntentCache(); // new provider may handle different intents
+    this.responseCache = new ResponseCache(100, 5 * 60_000);
+  }
+
   clearHistory(): void {
     this.history.clear();
   }
@@ -121,22 +134,42 @@ export class CakeAgent {
         return response;
       }
 
-      const firstWord = trimmed.toLowerCase().split(/\s+/)[0];
-      const directHandler = intentMap[firstWord];
-      if (directHandler) {
-        if (!UNCACHEABLE_INTENTS.has(firstWord)) {
-          const cached = this.responseCache.get(cacheKey);
-          if (cached) return cached;
+      // Try direct intentMap lookup:
+      // 1. Exact first word ("bash", "weather", "news" …)
+      // 2. First two words joined with underscore ("todo_remove", "cron_list" …)
+      //    This lets snake_case intent IDs typed verbatim bypass the AI router.
+      const words = trimmed.toLowerCase().split(/\s+/);
+      const candidates = [
+        words[0],
+        words.length >= 2 ? `${words[0]}_${words[1]}` : "",
+        words.length >= 3 ? `${words[0]}_${words[1]}_${words[2]}` : "",
+      ];
+      for (const candidate of candidates) {
+        const directHandler = intentMap[candidate];
+        if (directHandler) {
+          if (!UNCACHEABLE_INTENTS.has(candidate)) {
+            const cached = this.responseCache.get(cacheKey);
+            if (cached) return cached;
+          }
+          const result = await directHandler(this.provider, trimmed, this.model);
+          const response = { text: result.text, usage: result.usage };
+          if (!UNCACHEABLE_INTENTS.has(candidate))
+            this.responseCache.set(cacheKey, response);
+          return response;
         }
-        const result = await directHandler(this.provider, trimmed, this.model);
-        const response = { text: result.text, usage: result.usage };
-        if (!UNCACHEABLE_INTENTS.has(firstWord))
-          this.responseCache.set(cacheKey, response);
-        return response;
       }
     }
 
     // ── 3) AI intent router — only truly ambiguous inputs reach here ──────────
+    // At this point preClass is either "tool" (no regex/direct match found) or
+    // "ambiguous". If preClass was "tool" and we got here, the pre-classifier
+    // over-fired — safest to chat rather than waste another LLM call.
+    if (preClass === "tool") {
+      // The pre-classifier thought it was a tool, but no handler matched.
+      // Treat as chat to avoid burning an AI router token on a false positive.
+      return this.runChat(trimmed, opts);
+    }
+
     const regexHandler = matchRoute(trimmed);
     if (regexHandler) {
       const cached = this.responseCache.get(cacheKey);

@@ -19,7 +19,7 @@ export const COMMANDS: CommandSuggestion[] = [
   {
     command: "calendar",
     description: "Google Calendar management",
-    parameters: ["auth", "list", "create", "delete"],
+    parameters: ["auth", "list", "create", "remove"],
   },
   { command: "calendar_list", description: "List upcoming events" },
   {
@@ -193,7 +193,7 @@ export const COMMANDS: CommandSuggestion[] = [
   {
     command: "/provider <name>",
     description: "Switch to a different LLM provider",
-    parameters: ["claude", "openai", "gemini", "ollama"],
+    parameters: ["claude", "openai", "gemini", "ollama", "openrouter"],
   },
   { command: "/model <name>", description: "Switch to a different model" },
   { command: "/prefs", description: "Show current session & default settings" },

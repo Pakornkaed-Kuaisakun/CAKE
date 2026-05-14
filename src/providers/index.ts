@@ -4,8 +4,15 @@ import { ClaudeProvider } from "./claude.js";
 import { OpenAIProvider } from "./openai.js";
 import { GeminiProvider } from "./gemini.js";
 import { OllamaProvider } from "./ollama.js";
+import { OpenRouterProvider } from "./openrouter.js";
 
-export { ClaudeProvider, OpenAIProvider, GeminiProvider, OllamaProvider };
+export {
+  ClaudeProvider,
+  OpenAIProvider,
+  GeminiProvider,
+  OllamaProvider,
+  OpenRouterProvider,
+};
 export type {
   AIProvider,
   ProviderName,
@@ -23,6 +30,8 @@ export function createProvider(name: ProviderName): AIProvider {
       return new GeminiProvider();
     case "ollama":
       return new OllamaProvider();
+    case "openrouter":
+      return new OpenRouterProvider();
     default:
       throw new Error(`Unknown provider: ${name}`);
   }

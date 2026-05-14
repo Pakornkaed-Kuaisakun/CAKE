@@ -1,3 +1,4 @@
+// src/agent/autonomous/planner.ts
 import type { AIProvider } from "../../providers/types.js";
 import type { ThoughtStep } from "./types.js";
 import { AGENT_TOOLS } from "./toolRegistry.js";
@@ -5,27 +6,30 @@ import { getFastModel } from "../../providers/utils.js";
 
 function buildSystemPrompt(): string {
   const toolList = AGENT_TOOLS.map(
-    (t) => `  - ${t.name}: ${t.description}\n    example: "${t.example}"`,
+    (t) => `  - ${t.name}: ${t.description}\n    example input: "${t.example}"`,
   ).join("\n");
 
-  return `You are an autonomous AI agent. You are given a GOAL and must accomplish it step-by-step using the available tools.
- 
+  return `You are an autonomous AI agent. Accomplish the GOAL step-by-step using the tools below.
+
     AVAILABLE TOOLS:
     ${toolList}
-    
+
     RULES:
-    1. On each turn, output ONLY a JSON object — no extra text, no markdown fences.
+    1. Output ONLY a JSON object — no extra text, no markdown fences.
     2. The JSON must have exactly three fields:
-    {
-        "thought": "<your reasoning about what to do next>",
-        "tool": "<tool name from the list>",
-        "input": "<the exact string to pass to the tool>"
-    }
-    3. Always pick the most direct tool for the job.
-    4. When you have enough information to fully answer the goal, use "finish" as the tool and write the complete final answer in "input".
-    5. Do NOT repeat a tool call with the exact same input twice.
-    6. Keep "input" concise — it is passed directly to the tool.
-    7. If a previous tool returned an error, try a different approach or tool.`;
+      { "thought": "<reasoning>", "tool": "<tool name>", "input": "<exact string to pass>" }
+    3. Pick the most direct tool. Prefer fewer steps over more steps.
+    4. To SAVE content to a file:
+      a. First use "chat" to COMPOSE the full text content.
+      b. Then use "export" with input "<format> <filename>|<content>" to save it.
+      IMPORTANT: The "|" separates the filename from the content. Examples:
+        export md report.md|# My Report\n\nContent goes here...
+        export txt notes.txt|Line 1\nLine 2
+    5. Do NOT use "file_compose" to save a report — that tool generates from a description only.
+    6. When you have accomplished the goal, use "finish" with a brief summary as input.
+    7. Do NOT repeat a tool call with the exact same input twice.
+    8. If a tool returned an error, try a different approach.
+    9. Keep "input" concise but complete — it is passed directly to the tool.`;
 }
 
 function buildUserMessage(
@@ -39,9 +43,9 @@ function buildUserMessage(
   } else {
     msg += "STEPS TAKEN SO FAR:\n";
     for (const h of history) {
-      msg += `\nTool: ${h.tool}\nInput: ${h.input}\nOutput: ${h.output.slice(0, 800)}${h.output.length > 800 ? "…" : ""}\n`;
+      msg += `\nTool: ${h.tool}\nInput: ${h.input.slice(0, 200)}${h.input.length > 200 ? "…" : ""}\nOutput: ${h.output.slice(0, 600)}${h.output.length > 600 ? "…" : ""}\n`;
     }
-    msg += "\nWhat should be the next step?";
+    msg += "\nWhat should be the NEXT step to complete the goal?";
   }
   return msg;
 }
@@ -59,7 +63,7 @@ export async function planNextStep(
       { role: "system", content: buildSystemPrompt() },
       { role: "user", content: buildUserMessage(goal, history) },
     ],
-    { model: fastModel, temperature: 0.2, maxTokens: 600 },
+    { model: fastModel, temperature: 0.2, maxTokens: 800 },
   );
 
   const raw = result.text.replace(/```json|```/g, "").trim();
@@ -71,9 +75,8 @@ export async function planNextStep(
     }
     return parsed;
   } catch {
-    // Fallback: treat the whole response as a finish
     return {
-      thought: "Could not parse planner output - finishing with raw response.",
+      thought: "Could not parse planner output — finishing with raw response.",
       tool: "finish",
       input: result.text.trim(),
     };

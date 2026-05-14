@@ -28,6 +28,7 @@ import {
   resetCosts,
   costsFilePath,
 } from "../../config/costs.js";
+import { consumeEmbedWarning } from "../../modules/memory/index.js";
 
 const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
@@ -157,6 +158,17 @@ export function useAgent() {
       costUsd: usage.costUsd,
     });
   }, []);
+
+  const checkEmbedWarning = useCallback(() => {
+    if (consumeEmbedWarning()) {
+      addMsg(
+        "system",
+        "⚠️  Memory disabled — this provider does not support embeddings.\n" +
+          "   Long-term memory will not be saved this session.\n" +
+          "   Use openai or ollama (+ nomic-embed-text) to enable it.",
+      );
+    }
+  }, [addMsg]);
 
   // ─── Submit handler ────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
@@ -436,6 +448,7 @@ export function useAgent() {
               });
               const finalTime = Date.now() - t0;
               stopTimer();
+              checkEmbedWarning();
               accumulateUsage(resp.usage);
               setMessages((prev) =>
                 prev.map((m) =>
@@ -496,6 +509,7 @@ export function useAgent() {
         const resp = await agent.run(trimmed, runOpts);
         const finalTime = Date.now() - t0;
         stopTimer();
+        checkEmbedWarning();
         accumulateUsage(resp.usage);
 
         // For tool responses (non-streamed), replace the empty placeholder
@@ -539,6 +553,7 @@ export function useAgent() {
       accumulateUsage,
       loading,
       theme,
+      checkEmbedWarning,
     ],
   );
 

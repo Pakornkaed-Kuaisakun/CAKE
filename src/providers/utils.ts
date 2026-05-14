@@ -14,6 +14,10 @@ export function getFastModel(provider: ProviderName): string | undefined {
       return "gemini-2.0-flash";
     case "ollama":
       return "qwen2.5:3b";
+    case "openrouter":
+      return (
+        process.env.OPENROUTER_FAST_MODEL ?? "deepseek/deepseek-v4-flash:free"
+      );
     default:
       return undefined;
   }
