@@ -198,10 +198,11 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/model <name>", description: "Switch to a different model" },
   { command: "/prefs", description: "Show current session & default settings" },
   {
-    command: "/default [--save]",
-    description: "Save current session as your default",
+    command: "/default [set <p> [m] | provider <p> | model <m>]",
+    description: "Set default provider/model and switch session",
+    parameters: ["set", "provider", "model"],
   },
-  { command: "/default --reset", description: "Clear all saved defaults" },
+  { command: "/default --reset", description: "Reset all defaults to system values" },
   {
     command: "/theme <name>",
     description: "Switch theme: dark | light | neon | dracula",

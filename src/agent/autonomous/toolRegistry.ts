@@ -132,7 +132,7 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "export",
     description:
-      "Save text content to a file. Format: export <format> <filename>|<content> — the | separates the filename from the content to save. Supports: txt, md, json, csv, html.",
+      "Save text content to a file in the 'reports/' folder. Format: export <format> <filename>|<content> — the | separates the filename from the content. Supports: txt, md, json, csv, html.",
     example: "export md report.md|# My Report\n\nContent goes here...",
   },
   {

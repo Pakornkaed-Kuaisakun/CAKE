@@ -63,22 +63,107 @@ export async function planNextStep(
       { role: "system", content: buildSystemPrompt() },
       { role: "user", content: buildUserMessage(goal, history) },
     ],
-    { model: fastModel, temperature: 0.2, maxTokens: 800 },
+    { model: fastModel, temperature: 0.2, maxTokens: 1000 },
   );
 
-  const raw = result.text.replace(/```json|```/g, "").trim();
+  const step = extractThoughtStep(result.text);
+  if (step) return step;
+
+  // ── Retry: ask the model to output ONLY valid JSON ─────────────────────────
+  // Some models wrap the JSON in prose on the first attempt. One retry with a
+  // blunter prompt usually fixes it.
+  const retry = await provider.chat(
+    [
+      { role: "system", content: buildSystemPrompt() },
+      { role: "user", content: buildUserMessage(goal, history) },
+      { role: "assistant", content: result.text },
+      {
+        role: "user",
+        content:
+          'Your response was not valid JSON. Output ONLY the raw JSON object with fields "thought", "tool", and "input". No explanation, no markdown, no code fences.',
+      },
+    ],
+    { model: fastModel, temperature: 0, maxTokens: 600 },
+  );
+
+  const retryStep = extractThoughtStep(retry.text);
+  if (retryStep) return retryStep;
+
+  // ── Hard fallback ──────────────────────────────────────────────────────────
+  return {
+    thought: "Could not parse planner output after retry — finishing.",
+    tool: "finish",
+    input: retry.text.trim() || result.text.trim(),
+  };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * Attempts to extract a valid ThoughtStep JSON object from raw model text.
+ * Handles:
+ *   - Clean JSON: `{"thought":...}`
+ *   - Markdown-fenced: ```json\n{...}\n```
+ *   - Prose-wrapped: "Here is my step:\n{...}"
+ *   - Single-quoted keys (some small models)
+ */
+function extractThoughtStep(raw: string): ThoughtStep | null {
+  // 1. Strip markdown fences and whitespace
+  let text = raw.replace(/```(?:json)?/gi, "").trim();
+
+  // 2. Try direct parse first
+  const direct = tryParse(text);
+  if (direct) return direct;
+
+  // 3. Find the first {...} block that spans the most of the text
+  //    Handles prose before/after the JSON.
+  const match = text.match(/\{[\s\S]*\}/);
+  if (match) {
+    const block = tryParse(match[0]);
+    if (block) return block;
+  }
+
+  return null;
+}
+
+function tryParse(text: string): ThoughtStep | null {
+  const validate = (obj: any): ThoughtStep | null => {
+    if (
+      typeof obj === "object" &&
+      obj !== null &&
+      typeof obj.thought === "string" &&
+      typeof obj.tool === "string" &&
+      obj.input !== undefined
+    ) {
+      return {
+        thought: obj.thought,
+        tool: String(obj.tool).trim().toLowerCase(),
+        input: String(obj.input ?? ""),
+      };
+    }
+    return null;
+  };
 
   try {
-    const parsed = JSON.parse(raw) as ThoughtStep;
-    if (!parsed.thought || !parsed.tool || parsed.input === undefined) {
-      throw new Error("Missing required fields");
-    }
-    return parsed;
+    // Attempt 1: Standard JSON parse
+    return validate(JSON.parse(text));
   } catch {
-    return {
-      thought: "Could not parse planner output — finishing with raw response.",
-      tool: "finish",
-      input: result.text.trim(),
-    };
+    try {
+      // Attempt 2: Sanitize unescaped newlines inside double-quoted strings
+      // Smaller models (like Llama 3) often output raw newlines instead of \n
+      const sanitized = text.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (m, p1) => {
+        return '"' + p1.replace(/\n/g, "\\n").replace(/\r/g, "\\r") + '"';
+      });
+      return validate(JSON.parse(sanitized));
+    } catch {
+      // Attempt 3: Very aggressive - handle single quotes (some tiny models do this)
+      try {
+        const doubleQuoted = text.replace(/'/g, '"');
+        return validate(JSON.parse(doubleQuoted));
+      } catch {
+        return null;
+      }
+    }
   }
 }
+

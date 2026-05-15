@@ -303,6 +303,92 @@ export function useAgent() {
             );
             return;
           case "default": {
+            const sub = args[0];
+
+            if (sub === "--reset") {
+              const dProv = (env.defaultProvider || "claude") as ProviderName;
+              const dMod = env.defaultModel || null;
+              savePrefs({ provider: dProv, model: dMod });
+
+              setProviderName(dProv);
+              setModel(dMod || undefined);
+              setAgent(buildAgent(dProv, dMod || undefined));
+
+              addMsg(
+                "system",
+                `✅ Defaults reset to: provider=${dProv}, model=${dMod ?? "(none)"}`,
+              );
+              return;
+            }
+
+            if (sub === "set") {
+              const p = args[1] as ProviderName;
+              const m = args[2];
+              if (!p) {
+                addMsg("system", "Usage: /default set <provider> [model]");
+                return;
+              }
+              try {
+                // Validate by trying to create it
+                createProvider(p);
+
+                const update: any = { provider: p };
+                if (m) update.model = m;
+
+                savePrefs(update);
+                setProviderName(p);
+                if (m) {
+                  setModel(m);
+                  setAgent(buildAgent(p, m));
+                } else {
+                  setModel(undefined);
+                  setAgent(buildAgent(p, undefined));
+                }
+
+                addMsg(
+                  "system",
+                  `✅ Default set to: provider=${p}${m ? `, model=${m}` : ""}`,
+                );
+              } catch {
+                addMsg("system", `❌ Unknown provider: ${p}`);
+              }
+              return;
+            }
+
+            if (sub === "provider") {
+              const p = args[1] as ProviderName;
+              if (!p) {
+                addMsg("system", "Usage: /default provider <name>");
+                return;
+              }
+              try {
+                createProvider(p);
+                savePrefs({ provider: p });
+                setProviderName(p);
+                // Clear model when provider changes via explicit command for safety
+                setModel(undefined);
+                setAgent(buildAgent(p, undefined));
+                addMsg("system", `✅ Default provider set to: ${p}`);
+              } catch {
+                addMsg("system", `❌ Unknown provider: ${p}`);
+              }
+              return;
+            }
+
+            if (sub === "model") {
+              const m = args[1];
+              if (!m) {
+                addMsg("system", "Usage: /default model <name>");
+                return;
+              }
+              savePrefs({ model: m });
+              setModel(m);
+              agent.setModel(m);
+              addMsg("system", `✅ Default model set to: ${m}`);
+              return;
+            }
+
+            // Fallback: Save current session as default
             savePrefs({
               provider: providerName,
               model: model ?? null,
@@ -310,7 +396,7 @@ export function useAgent() {
             });
             addMsg(
               "system",
-              `✅ Saved default: provider=${providerName}${model ? `, model=${model}` : ", model=(none)"}\n   Stored in: ${prefsFilePath()}`,
+              `✅ Saved current session as default: provider=${providerName}${model ? `, model=${model}` : ", model=(none)"}\n   Stored in: ${prefsFilePath()}`,
             );
             return;
           }
