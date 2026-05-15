@@ -110,6 +110,13 @@ export class CakeAgent {
     this.history.clear();
   }
 
+  loadHistory(messages: import("../providers/types.js").Message[]): void {
+    this.history.clear();
+    for (const m of messages) {
+      this.history.push(m.role, m.content);
+    }
+  }
+
   // Accepts AbortSignal directly (old callers: cron, Discord) or RunOptions
   async run(
     input: string,

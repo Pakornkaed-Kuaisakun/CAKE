@@ -29,6 +29,7 @@ import {
   costsFilePath,
 } from "../../config/costs.js";
 import { consumeEmbedWarning } from "../../modules/memory/index.js";
+import { handleSessionCommand } from "../../agent/handlers/session.js";
 
 const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
@@ -77,8 +78,6 @@ export interface SessionStats {
   totalOutputTokens: number;
   totalCostUsd: number;
 }
-
-
 
 export function useAgent() {
   const { exit } = useApp();
@@ -139,8 +138,6 @@ export function useAgent() {
     totalCostUsd: 0,
   });
   const [lastEvents, setLastEvents] = useState<any[]>([]);
-
-
 
   const startTimer = useCallback(() => {
     setThinkingMs(0);
@@ -569,6 +566,52 @@ export function useAgent() {
 
           case "plugins": {
             const result = await agent.run("plugins");
+            addMsg("system", result.text);
+            return;
+          }
+          case "session": {
+            const result = handleSessionCommand(
+              args, // tokens after "/session"
+              messages, // current ChatMessage[] from state
+              providerName,
+              model,
+            );
+
+            if (result.kind === "error") {
+              addMsg("system", result.text);
+              return;
+            }
+
+            if (result.kind === "load") {
+              // Replace conversation history in both the UI and the agent
+              const loadedMessages = result.session.messages;
+
+              // Rebuild the agent's internal ConversationHistory
+              agent.clearHistory();
+              // CakeAgent doesn't expose a bulk-load method yet, so we replay:
+              // Add a thin public method to CakeAgent (see section 3 below),
+              // OR call agent.run() for each message — the replay approach is simpler.
+              // Use the new loadHistory() method (section 3):
+              agent.loadHistory(loadedMessages);
+
+              // Rebuild the UI message list — convert Message → ChatMessage
+              setMsgVersion((v) => v + 1);
+              setMessages([
+                {
+                  id: makeId(),
+                  role: "system",
+                  content: result.text,
+                },
+                ...loadedMessages.map((m) => ({
+                  id: makeId(),
+                  role: m.role as "user" | "assistant" | "system",
+                  content: m.content,
+                })),
+              ]);
+              return;
+            }
+
+            // kind === "message"
             addMsg("system", result.text);
             return;
           }

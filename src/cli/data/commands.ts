@@ -242,4 +242,19 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Show authentication status for all services",
   },
   { command: "/plugins", description: "List loaded plugins" },
+  { command: "/session list", description: "List all saved sessions" },
+  {
+    command: "/session save <name>",
+    description: "Save current conversation to a named session",
+  },
+  { command: "/session load <name>", description: "Restore a saved session" },
+  { command: "/session delete <name>", description: "Delete a saved session" },
+  {
+    command: "/session rename <old> <new>",
+    description: "Rename a saved session",
+  },
+  {
+    command: "/session info <name>",
+    description: "Show session metadata and message preview",
+  },
 ];
