@@ -557,6 +557,12 @@ export function useAgent() {
             return;
           }
 
+          case "plugins": {
+            const result = await agent.run("plugins");
+            addMsg("system", result.text);
+            return;
+          }
+
           default:
             addMsg("system", `Unknown command: ${trimmed}. Type /help.`);
             return;

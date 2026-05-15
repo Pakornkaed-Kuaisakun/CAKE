@@ -175,6 +175,10 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "auto check my emails summarize and add todos",
     description: "Multi-tool autonomous workflow",
   },
+  {
+    command: "plugins",
+    description: "List all loaded plugins and their triggers",
+  },
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },
@@ -202,7 +206,10 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Set default provider/model and switch session",
     parameters: ["set", "provider", "model"],
   },
-  { command: "/default --reset", description: "Reset all defaults to system values" },
+  {
+    command: "/default --reset",
+    description: "Reset all defaults to system values",
+  },
   {
     command: "/theme <name>",
     description: "Switch theme: dark | light | neon | dracula",
@@ -218,4 +225,5 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "/auth-status",
     description: "Show authentication status for all services",
   },
+  { command: "/plugins", description: "List loaded plugins" },
 ];

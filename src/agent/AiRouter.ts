@@ -51,6 +51,7 @@ const VALID_INTENTS = new Set([
   "performance",
   "bash",
   "autonomous",
+  "plugins",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -93,6 +94,7 @@ diagnose          — run system health check
 performance       — check system performance/speed
 bash              — run a shell or terminal command
 autonomous        — multi-step agent to accomplish a complex goal
+plugins           — list loaded plugins or plugin status
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -133,8 +135,8 @@ export async function aiIntentRouter(
     {
       model: fastModel,
       systemPrompt: SYSTEM_PROMPT,
-      temperature: 0,       // fully deterministic
-      maxTokens: 12,        // intent name is at most ~20 chars
+      temperature: 0, // fully deterministic
+      maxTokens: 12, // intent name is at most ~20 chars
     },
   );
 
@@ -142,7 +144,7 @@ export async function aiIntentRouter(
   const raw = result.text
     .trim()
     .toLowerCase()
-    .replace(/[^a-z_]/g, "")  // keep only letters and underscores
+    .replace(/[^a-z_]/g, "") // keep only letters and underscores
     .trim();
 
   const intent = VALID_INTENTS.has(raw) ? raw : "chat";

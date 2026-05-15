@@ -16,6 +16,7 @@ import { ResponseCache } from "./responseCache.js";
 import { getFastModel } from "../providers/utils.js";
 import { hasPipe, parsePipeline, executePipeline } from "./pipeline/index.js";
 import { clearIntentCache } from "./intentCache.js";
+import { loadPlugins, registerPlugins } from "./plugins/index.js";
 
 export interface AgentResponse {
   text: string;
@@ -42,6 +43,7 @@ const UNCACHEABLE_INTENTS = new Set([
   "auto",
   "agent",
   "autonomous",
+  "plugins",
 ]);
 
 export class CakeAgent {
@@ -64,6 +66,18 @@ export class CakeAgent {
       console.log(`[CRON] Running scheduled task: ${job.taskDescription}`);
       await this.run(job.taskDescription);
     });
+
+    // Load user plugins asynchronously (non-blocking)
+    loadPlugins()
+      .then((plugins) => {
+        registerPlugins(plugins);
+        if (plugins.length > 0) {
+          console.log(`[plugins] ${plugins.length} plugin(s) ready.`);
+        }
+      })
+      .catch((err) => {
+        console.warn("[plugins] Plugin load error:", err.message);
+      });
   }
 
   setModel(model: string | undefined): void {
@@ -151,7 +165,11 @@ export class CakeAgent {
             const cached = this.responseCache.get(cacheKey);
             if (cached) return cached;
           }
-          const result = await directHandler(this.provider, trimmed, this.model);
+          const result = await directHandler(
+            this.provider,
+            trimmed,
+            this.model,
+          );
           const response = { text: result.text, usage: result.usage };
           if (!UNCACHEABLE_INTENTS.has(candidate))
             this.responseCache.set(cacheKey, response);

@@ -1,5 +1,6 @@
 import type { AIProvider, ChatResult } from "../providers/types.js";
 import * as H from "./handlers/index.js";
+import { matchPluginRoute } from "./plugins/index.js";
 
 export type Handler = (
   provider: AIProvider,
@@ -197,7 +198,10 @@ export const ROUTES: Route[] = [
   },
   {
     // Must mention cron/job/schedule explicitly to avoid shadowing todo_remove
-    patterns: [/\b(remove|delete|cancel)\b.*\b(cron|scheduled\s+job|cron\s+job)\b/i, /^cron_remove\b/],
+    patterns: [
+      /\b(remove|delete|cancel)\b.*\b(cron|scheduled\s+job|cron\s+job)\b/i,
+      /^cron_remove\b/,
+    ],
     handler: H.handleRemoveCron,
   },
   {
@@ -222,7 +226,7 @@ export const ROUTES: Route[] = [
   {
     patterns: [
       /\b(finance|financial report|stock price|stock report)\b/i,
-      /\$[A-Z]{1,5}\b/,          // $AAPL style
+      /\$[A-Z]{1,5}\b/, // $AAPL style
       /^finance\b/i,
     ],
     handler: H.handleFinanceReport,
@@ -263,12 +267,23 @@ export const ROUTES: Route[] = [
     patterns: [/^(run\s+)?(auto|agent|autonomous)\s+/i],
     handler: H.handleAutonomous,
   },
+
+  // Plugins Management
+  {
+    patterns: [/^plugins?\b/i],
+    handler: H.handlePlugins,
+  },
 ];
 
 /**
  * Returns the handler for the first matching route, or null if no route matches.
  */
 export function matchRoute(input: string): Handler | null {
+  // 1. Plugin routes take highest priority
+  const pluginHandler = matchPluginRoute(input);
+  if (pluginHandler) return pluginHandler;
+
+  // 2. Built-in routes
   const lower = input.toLowerCase();
   for (const route of ROUTES) {
     if (route.patterns.some((p) => p.test(lower))) return route.handler;

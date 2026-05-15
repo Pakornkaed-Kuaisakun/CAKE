@@ -51,7 +51,7 @@ const TOOL_PREFIXES = new Set([
   // Short unambiguous CLI words
   "ls",
   "cat",
-  "tree",  // UNIX command
+  "tree", // UNIX command
   "bash",
   "shell",
   "news",
@@ -61,6 +61,7 @@ const TOOL_PREFIXES = new Set([
   "auto",
   "agent",
   "autonomous",
+  "plugins",
   // Prefixes with no conversational meaning on their own
   "diagnose",
   "diagnosis",

@@ -1,5 +1,6 @@
 import * as H from "./handlers/index.js";
 import type { AIProvider, ChatResult } from "../providers/types.js";
+import { getPluginIntentMap } from "./plugins/index.js";
 
 export type Handler = (
   provider: AIProvider,
@@ -7,7 +8,7 @@ export type Handler = (
   model?: string,
 ) => Promise<ChatResult>;
 
-export const intentMap: Record<string, Handler> = {
+export const BASE_INTENT_MAP: Record<string, Handler> = {
   // ── Core chat ──────────────────────────────────────────────────────────────
   chat: H.handleChat,
 
@@ -73,4 +74,32 @@ export const intentMap: Record<string, Handler> = {
 
   // ── Autonomous Agent ───────────────────────────────────────────────────────
   autonomous: H.handleAutonomous,
+
+  // ── Plugins ────────────────────────────────────────────────────────────────
+  plugins: H.handlePlugins,
 };
+
+/**
+ * Returns the merged intent map: built-ins + all loaded plugin intents.
+ * Called on every routing decision so new plugins are always reflected.
+ */
+export function getIntentMap(): Record<string, Handler> {
+  return { ...BASE_INTENT_MAP, ...getPluginIntentMap() };
+}
+
+// Keep backward-compat alias for the few places that import intentMap directly
+export const intentMap: Record<string, Handler> = new Proxy({} as any, {
+  get(_t, key: string) {
+    return getIntentMap()[key];
+  },
+  has(_t, key: string) {
+    return key in getIntentMap();
+  },
+  ownKeys() {
+    return Object.keys(getIntentMap());
+  },
+  getOwnPropertyDescriptor(_t, key: string) {
+    const v = getIntentMap()[key];
+    return v ? { value: v, enumerable: true, configurable: true } : undefined;
+  },
+});
