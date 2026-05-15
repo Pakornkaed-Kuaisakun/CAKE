@@ -77,6 +77,9 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
 
   // ── Plugins ────────────────────────────────────────────────────────────────
   plugins: H.handlePlugins,
+
+  screenshot: H.handleScreenshot,
+  vision: H.handleScreenshot,
 };
 
 /**

@@ -52,6 +52,8 @@ const VALID_INTENTS = new Set([
   "bash",
   "autonomous",
   "plugins",
+  "screenshot",
+  "vision",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -95,6 +97,8 @@ performance       — check system performance/speed
 bash              — run a shell or terminal command
 autonomous        — multi-step agent to accomplish a complex goal
 plugins           — list loaded plugins or plugin status
+screenshot        — capture and describe the screen
+vision            — alias for screenshot
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -116,7 +120,10 @@ EXAMPLES (input → intent):
 "remind me to take pills at 8am" → cron_schedule
 "notify take pills" → notify
 "what is machine learning?" → chat
-"how are you?" → chat`;
+"how are you?" → chat
+"what's on my screen?" → screenshot
+"screenshot what app is open?" → screenshot
+"analyze my screen" → screenshot`;
 
 export async function aiIntentRouter(
   provider: AIProvider,

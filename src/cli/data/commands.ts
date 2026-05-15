@@ -179,6 +179,22 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "plugins",
     description: "List all loaded plugins and their triggers",
   },
+  {
+    command: "screenshot [question] <BETA>",
+    description: "Capture screen and analyze it with AI vision",
+  },
+  {
+    command: "screenshot region <x,y,w,h> [question] <BETA>",
+    description: "Capture a screen region and analyze",
+  },
+  {
+    command: "screenshot save <path> [question] <BETA>",
+    description: "Capture, save to file, and analyze",
+  },
+  {
+    command: "vision <question> <BETA>",
+    description: "Take a screenshot and answer a question about it",
+  },
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },

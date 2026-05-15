@@ -273,6 +273,17 @@ export const ROUTES: Route[] = [
     patterns: [/^plugins?\b/i],
     handler: H.handlePlugins,
   },
+
+  // Vision
+  {
+    patterns: [
+      /^screenshot\b/i,
+      /^vision\b/i,
+      /^screen\s+analyze\b/i,
+      /what'?s?\s+on\s+(my\s+)?screen/i,
+    ],
+    handler: H.handleScreenshot,
+  },
 ];
 
 /**

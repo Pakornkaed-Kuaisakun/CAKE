@@ -62,6 +62,8 @@ const TOOL_PREFIXES = new Set([
   "agent",
   "autonomous",
   "plugins",
+  "screenshot",
+  "vision",
   // Prefixes with no conversational meaning on their own
   "diagnose",
   "diagnosis",
@@ -102,6 +104,8 @@ const TOOL_PATTERNS: RegExp[] = [
   /\b(security scan|virus scan|malware scan|scan for)\b/i,
   // Export / save with format
   /^(export|save|write)\s+(txt|md|json|csv|html|text|markdown)\b/i,
+  // Screenshot / vision
+  /what'?s?\s+on\s+(my\s+)?screen/i,
 ];
 
 // ── Conversational patterns that definitively mean chat ───────────────────

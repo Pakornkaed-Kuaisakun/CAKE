@@ -17,3 +17,4 @@ export * from "./chat.js";
 export * from "./bash.js";
 export * from "./autonomous.js";
 export * from "./plugins.js";
+export * from "./vision.js";
