@@ -13,6 +13,7 @@ import {
 } from "../../modules/calendar/index.js";
 import { TOKEN_FILE, APP_NAME } from "../../config/constants.js";
 import type { ChatMessage } from "../components/MessageList.js";
+import type { UseVoiceReturn } from "./useVoice.js";
 import { env } from "../../config/env.js";
 import {
   loadPrefs,
@@ -100,6 +101,11 @@ export function useAgent() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [thinkingMs, setThinkingMs] = useState<number | null>(null);
+
+  const voiceRef = useRef<UseVoiceReturn | null>(null);
+  const registerVoice = useCallback((v: UseVoiceReturn) => {
+    voiceRef.current = v;
+  }, []);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -616,6 +622,45 @@ export function useAgent() {
             return;
           }
 
+          case "voice": {
+            const sub = args[0]?.toLowerCase();
+            const voice = voiceRef.current;
+
+            if (!voice) {
+              addMsg(
+                "system",
+                "❌ Voice system not initialized. Try again in a moment.",
+              );
+              return;
+            }
+
+            if (!sub || sub === "on") {
+              if (!voice.voiceEnabled) voice.toggleVoice();
+              addMsg(
+                "system",
+                voice.voiceEnabled
+                  ? "Voice mode already on. F2 = push-to-talk."
+                  : "🎤 Voice mode ON. Press F2 to start recording.",
+              );
+            } else if (sub === "off") {
+              if (voice.voiceEnabled) voice.toggleVoice();
+              addMsg("system", "🔇 Voice mode OFF.");
+            } else if (sub === "status") {
+              addMsg("system", voice.statusLine || "Voice mode is off.");
+            } else {
+              addMsg(
+                "system",
+                [
+                  "Usage:",
+                  "  /voice on      — enable voice mode",
+                  "  /voice off     — disable voice mode",
+                  "  /voice status  — show current backend info",
+                ].join("\n"),
+              );
+            }
+            return;
+          }
+
           default:
             addMsg("system", `Unknown command: ${trimmed}. Type /help.`);
             return;
@@ -713,5 +758,6 @@ export function useAgent() {
     model,
     handleSubmit,
     stats,
+    registerVoice,
   };
 }

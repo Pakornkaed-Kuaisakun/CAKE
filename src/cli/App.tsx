@@ -1,11 +1,13 @@
 // src/cli/App.tsx
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useEffect } from "react";
+import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { Header } from "./components/Header.js";
 import { MessageList } from "./components/MessageList.js";
 import { InputBar } from "./components/InputBar.js";
 import { useAgent } from "./hooks/useAgent.js";
+import { VoiceBar } from "./components/VoiceBar.js";
+import { useVoice } from "./hooks/useVoice.js";
 
 function formatMs(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -29,7 +31,34 @@ export function App() {
     model,
     handleSubmit,
     stats,
+    registerVoice,
   } = useAgent();
+
+  const voice = useVoice(handleSubmit);
+  const {
+    voiceEnabled,
+    isRecording,
+    isSpeaking,
+    statusLine,
+    toggleVoice,
+    handleVoiceKey,
+    makeSpeakingOnChunk,
+    speakText,
+    stopSpeaking,
+  } = voice;
+
+  useEffect(() => {
+    registerVoice(voice);
+  }, [voice, registerVoice]);
+
+  useInput((input, key) => {
+    if (handleVoiceKey(input, key)) return; // F2 consumed
+
+    // Stop speaking on any regular key press
+    if (isSpeaking && !key.ctrl) {
+      stopSpeaking();
+    }
+  });
 
   const hasUsage = stats.totalInputTokens > 0 || stats.totalOutputTokens > 0;
 
@@ -38,6 +67,14 @@ export function App() {
       <Header provider={providerName} model={model} />
 
       <MessageList messages={messages} version={msgVersion} />
+
+      {voiceEnabled && (
+        <VoiceBar
+          isRecording={isRecording}
+          isSpeaking={isSpeaking}
+          statusLine={statusLine}
+        />
+      )}
 
       {/* ── Thinking indicator ── */}
       {loading && (

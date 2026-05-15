@@ -257,4 +257,7 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "/session info <name>",
     description: "Show session metadata and message preview",
   },
+  { command: "/voice on", description: "Enable voice mode (F2 push-to-talk)" },
+  { command: "/voice off", description: "Disable voice mode" },
+  { command: "/voice status", description: "Show STT/TTS backend info" },
 ];
