@@ -1,5 +1,5 @@
 // src/agent/plugins/index.ts
-export { loadPlugins, PLUGINS_DIR } from "./loader.js";
+export { loadAllPlugins, PLUGINS_DIR } from "./loader.js";
 export {
   registerPlugins,
   getPlugins,

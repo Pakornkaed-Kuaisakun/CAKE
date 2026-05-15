@@ -16,7 +16,8 @@ import { ResponseCache } from "./responseCache.js";
 import { getFastModel } from "../providers/utils.js";
 import { hasPipe, parsePipeline, executePipeline } from "./pipeline/index.js";
 import { clearIntentCache } from "./intentCache.js";
-import { loadPlugins, registerPlugins } from "./plugins/index.js";
+import { loadAllPlugins } from "./plugins/loader.js";
+import { registerPlugins } from "./plugins/registry.js";
 
 export interface AgentResponse {
   text: string;
@@ -54,7 +55,11 @@ export class CakeAgent {
   private fastModel: string | undefined;
   private responseCache: ResponseCache;
 
-  constructor(provider: AIProvider, model?: string) {
+  constructor(
+    provider: AIProvider,
+    model?: string,
+    onLog?: (msg: string) => void,
+  ) {
     this.provider = provider;
     this.history = new ConversationHistory();
     this.memory = new MemoryManager(provider);
@@ -63,20 +68,26 @@ export class CakeAgent {
     this.responseCache = new ResponseCache(100, 5 * 60_000);
 
     initCronManager(async (job) => {
-      console.log(`[CRON] Running scheduled task: ${job.taskDescription}`);
+      const msg = `[CRON] Running scheduled task: ${job.taskDescription}`;
+      if (onLog) onLog(msg);
+      else console.log(msg);
       await this.run(job.taskDescription);
     });
 
     // Load user plugins asynchronously (non-blocking)
-    loadPlugins()
+    loadAllPlugins(onLog)
       .then((plugins) => {
         registerPlugins(plugins);
         if (plugins.length > 0) {
-          console.log(`[plugins] ${plugins.length} plugin(s) ready.`);
+          const msg = `[plugins] ${plugins.length} plugin(s) ready.`;
+          if (onLog) onLog(msg);
+          else console.log(msg);
         }
       })
       .catch((err) => {
-        console.warn("[plugins] Plugin load error:", err.message);
+        const msg = `[plugins] Plugin load error: ${err.message}`;
+        if (onLog) onLog(msg);
+        else console.warn(msg);
       });
   }
 

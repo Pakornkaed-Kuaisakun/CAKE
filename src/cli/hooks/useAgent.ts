@@ -78,9 +78,7 @@ export interface SessionStats {
   totalCostUsd: number;
 }
 
-function buildAgent(provName: ProviderName, mod?: string): CakeAgent {
-  return new CakeAgent(createProvider(provName), mod);
-}
+
 
 export function useAgent() {
   const { exit } = useApp();
@@ -111,15 +109,6 @@ export function useAgent() {
 
   const [providerName, setProviderName] = useState<ProviderName>(INIT_PROVIDER);
   const [model, setModel] = useState<string | undefined>(INIT_MODEL);
-  const [agent, setAgent] = useState<CakeAgent>(() =>
-    buildAgent(INIT_PROVIDER, INIT_MODEL),
-  );
-  const [stats, setStats] = useState<SessionStats>({
-    totalInputTokens: 0,
-    totalOutputTokens: 0,
-    totalCostUsd: 0,
-  });
-  const [lastEvents, setLastEvents] = useState<any[]>([]);
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const addMsg = useCallback(
@@ -131,6 +120,27 @@ export function useAgent() {
     },
     [],
   );
+
+  const buildAgent = useCallback(
+    (provName: ProviderName, mod?: string) => {
+      return new CakeAgent(createProvider(provName), mod, (msg) => {
+        addMsg("system", msg);
+      });
+    },
+    [addMsg],
+  );
+
+  const [agent, setAgent] = useState<CakeAgent>(() =>
+    buildAgent(INIT_PROVIDER, INIT_MODEL),
+  );
+  const [stats, setStats] = useState<SessionStats>({
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
+    totalCostUsd: 0,
+  });
+  const [lastEvents, setLastEvents] = useState<any[]>([]);
+
+
 
   const startTimer = useCallback(() => {
     setThinkingMs(0);

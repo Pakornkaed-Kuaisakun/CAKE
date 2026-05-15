@@ -29,9 +29,10 @@ function isValidPlugin(obj: unknown): obj is Plugin {
 
 /**
  * Loads all plugins from PLUGINS_DIR.
- * Always resolves (never rejects) — errors are logged and skipped.
  */
-export async function loadPlugins(): Promise<LoadedPlugin[]> {
+export async function loadAllPlugins(
+  onLog?: (msg: string) => void,
+): Promise<LoadedPlugin[]> {
   // Ensure the directory exists so users can drop plugins there
   if (!fs.existsSync(PLUGINS_DIR)) {
     fs.mkdirSync(PLUGINS_DIR, { recursive: true });
@@ -41,7 +42,9 @@ export async function loadPlugins(): Promise<LoadedPlugin[]> {
   try {
     entries = fs.readdirSync(PLUGINS_DIR, { withFileTypes: true });
   } catch (err: any) {
-    console.warn(`[plugins] Could not read plugins directory: ${err.message}`);
+    const msg = `[plugins] Could not read plugins directory: ${err.message}`;
+    if (onLog) onLog(msg);
+    else console.warn(msg);
     return [];
   }
 
@@ -61,21 +64,22 @@ export async function loadPlugins(): Promise<LoadedPlugin[]> {
       const exported = mod.default ?? mod;
 
       if (!isValidPlugin(exported)) {
-        console.warn(
+        const msg =
           `[plugins] Skipping "${path.basename(filePath)}" — invalid plugin shape.\n` +
-            `  Required: { name, description, handler, patterns|intents }`,
-        );
+          `  Required: { name, description, handler, patterns|intents }`;
+        if (onLog) onLog(msg);
+        else console.warn(msg);
         continue;
       }
 
       loaded.push({ ...exported, filePath });
-      console.log(
-        `[plugins] Loaded: ${exported.name} (${path.basename(filePath)})`,
-      );
+      const msg = `[plugins] Loaded: ${exported.name} (${path.basename(filePath)})`;
+      if (onLog) onLog(msg);
+      else console.log(msg);
     } catch (err: any) {
-      console.warn(
-        `[plugins] Failed to load "${path.basename(filePath)}": ${err.message}`,
-      );
+      const msg = `[plugins] Failed to load "${path.basename(filePath)}": ${err.message}`;
+      if (onLog) onLog(msg);
+      else console.warn(msg);
     }
   }
   return loaded;
