@@ -109,7 +109,6 @@ export function useAgent() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Tracks the id of the message currently being streamed into
   const streamingIdRef = useRef<string | null>(null);
 
   const [providerName, setProviderName] = useState<ProviderName>(INIT_PROVIDER);
@@ -201,7 +200,7 @@ export function useAgent() {
         return;
       }
 
-      // ── Slash commands (unchanged from original) ──────────────────────────
+      // ── Slash commands ──────────────────────────────────────────────────
       if (trimmed.startsWith("/")) {
         const [cmd, ...args] = trimmed.slice(1).split(" ");
 
@@ -271,7 +270,7 @@ export function useAgent() {
               detached: true,
               stdio: "inherit",
               cwd: process.cwd(),
-              shell: process.platform === "win32", // needed on Windows
+              shell: process.platform === "win32",
             }).unref();
             process.exit(0);
           }
@@ -322,11 +321,9 @@ export function useAgent() {
               const dProv = (env.defaultProvider || "claude") as ProviderName;
               const dMod = env.defaultModel || null;
               savePrefs({ provider: dProv, model: dMod });
-
               setProviderName(dProv);
               setModel(dMod || undefined);
               setAgent(buildAgent(dProv, dMod || undefined));
-
               addMsg(
                 "system",
                 `✅ Defaults reset to: provider=${dProv}, model=${dMod ?? "(none)"}`,
@@ -342,12 +339,9 @@ export function useAgent() {
                 return;
               }
               try {
-                // Validate by trying to create it
                 createProvider(p);
-
                 const update: any = { provider: p };
                 if (m) update.model = m;
-
                 savePrefs(update);
                 setProviderName(p);
                 if (m) {
@@ -357,7 +351,6 @@ export function useAgent() {
                   setModel(undefined);
                   setAgent(buildAgent(p, undefined));
                 }
-
                 addMsg(
                   "system",
                   `✅ Default set to: provider=${p}${m ? `, model=${m}` : ""}`,
@@ -378,7 +371,6 @@ export function useAgent() {
                 createProvider(p);
                 savePrefs({ provider: p });
                 setProviderName(p);
-                // Clear model when provider changes via explicit command for safety
                 setModel(undefined);
                 setAgent(buildAgent(p, undefined));
                 addMsg("system", `✅ Default provider set to: ${p}`);
@@ -401,7 +393,6 @@ export function useAgent() {
               return;
             }
 
-            // Fallback: Save current session as default
             savePrefs({
               provider: providerName,
               model: model ?? null,
@@ -425,11 +416,12 @@ export function useAgent() {
             if (THEMES[name]) {
               setAppTheme(name);
               addMsg("system", `✅ Theme switched to: ${name}`);
-            } else
+            } else {
               addMsg(
                 "system",
                 `Unknown theme: ${name}. Available: ${Object.keys(THEMES).join(", ")}`,
               );
+            }
             return;
           }
           case "prefs": {
@@ -529,7 +521,6 @@ export function useAgent() {
               return;
             }
             const goal = args.join(" ");
-            // Route through the normal agent.run so streaming works
             addMsg("user", `auto ${goal}`);
             setLoading(true);
             startTimer();
@@ -556,6 +547,8 @@ export function useAgent() {
                     : m,
                 ),
               );
+              // Speak tool response (non-streamed)
+              voiceRef.current?.speakText(resp.text, false);
             } catch (err: any) {
               stopTimer();
               setMessages((prev) => prev.filter((m) => m.id !== streamId));
@@ -576,9 +569,16 @@ export function useAgent() {
             return;
           }
           case "session": {
+            // BUG FIX: handleSessionCommand expects Message[] (role+content),
+            // but messages is ChatMessage[] (id+role+content+thinkingTime).
+            // Strip the extra fields before passing to the session handler.
+            const sessionMessages = messages.map(({ role, content }) => ({
+              role,
+              content,
+            }));
             const result = handleSessionCommand(
-              args, // tokens after "/session"
-              messages, // current ChatMessage[] from state
+              args,
+              sessionMessages,
               providerName,
               model,
             );
@@ -589,18 +589,9 @@ export function useAgent() {
             }
 
             if (result.kind === "load") {
-              // Replace conversation history in both the UI and the agent
               const loadedMessages = result.session.messages;
-
-              // Rebuild the agent's internal ConversationHistory
               agent.clearHistory();
-              // CakeAgent doesn't expose a bulk-load method yet, so we replay:
-              // Add a thin public method to CakeAgent (see section 3 below),
-              // OR call agent.run() for each message — the replay approach is simpler.
-              // Use the new loadHistory() method (section 3):
               agent.loadHistory(loadedMessages);
-
-              // Rebuild the UI message list — convert Message → ChatMessage
               setMsgVersion((v) => v + 1);
               setMessages([
                 {
@@ -617,7 +608,6 @@ export function useAgent() {
               return;
             }
 
-            // kind === "message"
             addMsg("system", result.text);
             return;
           }
@@ -675,7 +665,6 @@ export function useAgent() {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      // Create a placeholder assistant message that we'll stream into
       const streamId = makeId();
       streamingIdRef.current = streamId;
       setMessages((prev) => [
@@ -684,16 +673,25 @@ export function useAgent() {
       ]);
 
       try {
+        // BUG FIX: Wire voice into onChunk so streaming responses are spoken.
+        // Previously makeSpeakingOnChunk was never called here — voice was
+        // entirely disconnected from the main agent.run() path.
+        const baseOnChunk = (chunk: string) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === streamId ? { ...m, content: m.content + chunk } : m,
+            ),
+          );
+        };
+
+        const voice = voiceRef.current;
+        const onChunk = voice
+          ? voice.makeSpeakingOnChunk(baseOnChunk)
+          : baseOnChunk;
+
         const runOpts: RunOptions = {
           signal: controller.signal,
-          onChunk: (chunk: string) => {
-            // Append each chunk to the streaming message in real time
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === streamId ? { ...m, content: m.content + chunk } : m,
-              ),
-            );
-          },
+          onChunk,
         };
 
         const resp = await agent.run(trimmed, runOpts);
@@ -702,9 +700,12 @@ export function useAgent() {
         checkEmbedWarning();
         accumulateUsage(resp.usage);
 
-        // For tool responses (non-streamed), replace the empty placeholder
-        // with the actual result. For streamed responses the content is
-        // already correct, just update the thinkingTime.
+        // Determine if the response was streamed (content already in message)
+        // or came back as a single tool result (placeholder still empty).
+        const wasStreamed = Boolean(
+          messages.find((m) => m.id === streamId)?.content,
+        );
+
         setMessages((prev) =>
           prev.map((m) =>
             m.id === streamId
@@ -716,9 +717,13 @@ export function useAgent() {
               : m,
           ),
         );
+
+        // Flush sentence buffer / speak tool response
+        if (voice) {
+          await voice.speakText(resp.text, wasStreamed);
+        }
       } catch (err: any) {
         stopTimer();
-        // Remove the empty placeholder on error
         setMessages((prev) => prev.filter((m) => m.id !== streamId));
         if (err.name === "AbortError" || err.message?.includes("abort")) return;
         addMsg(
@@ -744,6 +749,7 @@ export function useAgent() {
       loading,
       theme,
       checkEmbedWarning,
+      messages,
     ],
   );
 

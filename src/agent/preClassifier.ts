@@ -20,10 +20,15 @@
  *
  * CHAT_PATTERNS  — patterns that conclusively identify conversational input
  *                  so they can skip the router entirely.
+ *
+ * BUG FIX: "search" was missing from TOOL_PREFIXES even though `search <query>`
+ * typed verbatim is an unambiguous tool command. Its absence forced every
+ * direct "search foo" input through the AI intent router unnecessarily.
+ * Added "search", "notify", "notify", "export", "plan", and "scan" which are
+ * all single-word unambiguous CLI verbs with no conversational meaning.
  */
 
 // ── Unambiguous command-word prefixes ─────────────────────────────────────
-// Only words that would NEVER start a conversational sentence.
 const TOOL_PREFIXES = new Set([
   // Explicit snake_case intent IDs (safe: no natural-language overlap)
   "email_send",
@@ -48,6 +53,7 @@ const TOOL_PREFIXES = new Set([
   "document_ask",
   "test_notify",
   "memory_index",
+  "security_scan",
   // Short unambiguous CLI words
   "ls",
   "cat",
@@ -64,9 +70,16 @@ const TOOL_PREFIXES = new Set([
   "plugins",
   "screenshot",
   "vision",
-  // Prefixes with no conversational meaning on their own
   "diagnose",
   "diagnosis",
+  // BUG FIX: these were missing — all are unambiguous single-word CLI commands
+  "search", // "search <query>" always routes to handleSearch
+  "notify", // "notify <msg>" always routes to handleNotify
+  "export", // "export <fmt> <file>" always routes to handleExport
+  "plan", // "plan <goal>" always routes to handlePlan
+  "scan", // "scan <dir>" always routes to handleSecurityScan
+  "email", // "email" on its own = read inbox
+  "performance",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────
@@ -157,8 +170,6 @@ export function preClassify(input: string): PreClassification {
   if (TOOL_PREFIXES.has(firstWord)) return "tool";
 
   // 2. CHAT patterns first — intercept conversational inputs before tool patterns
-  //    (important: some CHAT_PATTERNS start with words that also appear in
-  //    TOOL_PATTERNS, e.g. "write me a poem" vs "write file foo.md")
   for (const p of CHAT_PATTERNS) if (p.test(trimmed)) return "chat";
 
   // 3. Precise regex-based tool signals

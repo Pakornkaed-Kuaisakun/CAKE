@@ -1,4 +1,4 @@
-import type { Tool } from "../types.js";
+import type { Tool } from "./types.js";
 
 import { writeFile } from "../../modules/files/operations.js";
 

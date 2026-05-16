@@ -34,6 +34,12 @@ export function App() {
     registerVoice,
   } = useAgent();
 
+  // BUG FIX: useVoice's speakText and makeSpeakingOnChunk signatures changed.
+  // The hook no longer accepts an `onResponseEnd` callback in makeSpeakingOnChunk
+  // (that was an unused parameter in the original signature).
+  // speakText now requires a `wasStreamed` boolean argument.
+  // App.tsx wires the voice hook to useAgent via registerVoice — the actual
+  // calls happen inside useAgent.ts, so App.tsx only needs to handle F2 and UI.
   const voice = useVoice(handleSubmit);
   const {
     voiceEnabled,
@@ -42,8 +48,6 @@ export function App() {
     statusLine,
     toggleVoice,
     handleVoiceKey,
-    makeSpeakingOnChunk,
-    speakText,
     stopSpeaking,
   } = voice;
 

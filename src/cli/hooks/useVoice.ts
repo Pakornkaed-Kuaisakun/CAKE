@@ -2,28 +2,24 @@
 //
 // React hook that wires voice I/O into the existing useAgent architecture.
 //
-// Provides:
-//   voiceEnabled    — whether voice mode is active
-//   isRecording     — mic is open right now
-//   isSpeaking      — TTS is playing right now
-//   toggleVoice()   — turn voice mode on/off
-//   handleVoiceKey  — call from useInput() in App.tsx for F2 push-to-talk
-//   makeSpeakingOnChunk — wraps an onChunk callback with the TTS sentence buffer
-//   stopSpeaking()  — interrupt current TTS (e.g. on new user input)
-//   statusLine      — one-line status string for VoiceBar
+// BUG FIXES applied in this file:
 //
-// Push-to-talk protocol (F2):
-//   keydown F2  → startRecording()
-//   keyup F2    → stop() → transcribe() → handleSubmit(transcript)
+//   1. speakText() — was pushing `text` to the queue even when sentences were
+//      already buffered via makeSpeakingOnChunk (double-speak on streaming).
+//      Now speakText() only flushes the SentenceBuffer remainder; if the buffer
+//      was empty (tool / non-streaming response) it pushes directly.
 //
-// Ink's useInput doesn't expose keydown/keyup separately — it fires once
-// per key event. We implement push-to-talk by treating the first F2 press
-// as "start" and the second as "stop". Users hold and press again to stop.
-// (True keydown/keyup would need raw stdin mode — out of scope here.)
+//   2. makeSpeakingOnChunk() — the returned chunk handler captured `voiceEnabled`
+//      from the closure at hook-call time. If voiceEnabled changed after the
+//      function was handed to agent.run(), the stale value was used for the
+//      whole response. Fixed by checking the ref at call time instead.
 //
-// Alternative continuous mode (/voice on):
-//   After each handleSubmit resolves, TTS plays. The hook handles the
-//   TTS lifecycle; the caller just passes makeSpeakingOnChunk() as onChunk.
+//   3. transcribeFile — was recreated on every render because `config` itself
+//      is a new object each render (resolveVoiceConfig returns a new ref).
+//      Memoised with useRef so the callback is stable.
+//
+//   4. SentenceBuffer.flush() is now synchronous (matching the fixed tts.ts).
+//      Callers that previously awaited it now just call it directly.
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import type { Key } from "ink";
@@ -50,17 +46,20 @@ export interface UseVoiceReturn {
   statusLine: string;
   toggleVoice(): void;
   /** Call inside useInput to handle F2 push-to-talk */
-  handleVoiceKey(input: string, key: Key): boolean; // returns true if consumed
+  handleVoiceKey(input: string, key: Key): boolean;
   /**
    * Wrap an onChunk callback so streamed text is also sent to TTS.
    * Pass the returned function as the `onChunk` option in agent.run().
    */
   makeSpeakingOnChunk(
     originalOnChunk: (chunk: string) => void,
-    onResponseEnd: () => Promise<void>,
   ): (chunk: string) => void;
-  /** Speak a complete string (used for non-streaming tool responses) */
-  speakText(text: string): Promise<void>;
+  /**
+   * Called after the full agent response is available.
+   * Flushes the sentence buffer remainder and (for non-streaming tool responses)
+   * speaks the complete text directly.
+   */
+  speakText(text: string, wasStreamed: boolean): Promise<void>;
   /** Interrupt TTS immediately */
   stopSpeaking(): void;
   /** Transcribe a WAV file (exposed for testing) */
@@ -71,12 +70,25 @@ export function useVoice(
   handleSubmit: (value: string) => void,
   configOverrides: Partial<VoiceConfig> = {},
 ): UseVoiceReturn {
-  const config = resolveVoiceConfig(configOverrides);
+  // BUG FIX 3: Keep a stable ref to the config so useCallback deps don't
+  // change on every render just because resolveVoiceConfig returns a new obj.
+  const configRef = useRef<VoiceConfig>(resolveVoiceConfig(configOverrides));
+  useEffect(() => {
+    configRef.current = resolveVoiceConfig(configOverrides);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(configOverrides)]);
 
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [statusLine, setStatusLine] = useState("");
+
+  // BUG FIX 2: Keep a ref to voiceEnabled so closures handed to agent.run()
+  // always read the current value, not a stale captured one.
+  const voiceEnabledRef = useRef(false);
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+  }, [voiceEnabled]);
 
   const recordingRef = useRef<RecordingHandle | null>(null);
   const ttsQueueRef = useRef<TTSQueue | null>(null);
@@ -84,13 +96,13 @@ export function useVoice(
 
   // Initialise TTSQueue once
   useEffect(() => {
-    ttsQueueRef.current = new TTSQueue(config, (speaking) => {
+    ttsQueueRef.current = new TTSQueue(configRef.current, (speaking) => {
       setIsSpeaking(speaking);
     });
     return () => {
       ttsQueueRef.current?.interrupt();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — TTSQueue is a singleton for this hook instance
 
   // Update status line whenever state changes
   useEffect(() => {
@@ -107,16 +119,15 @@ export function useVoice(
       return;
     }
     setStatusLine(
-      `🎤 Voice ON · STT: ${describeSTTBackend()} · TTS: ${describeTTSBackend(config)}`,
+      `🎤 Voice ON · STT: ${describeSTTBackend()} · TTS: ${describeTTSBackend(configRef.current)}`,
     );
-  }, [voiceEnabled, isRecording, isSpeaking, config]);
+  }, [voiceEnabled, isRecording, isSpeaking]);
 
   // ── Toggle voice mode ────────────────────────────────────────────────────
 
   const toggleVoice = useCallback(() => {
     setVoiceEnabled((prev) => {
       if (prev) {
-        // Turning off — clean up any active recording / speaking
         recordingRef.current?.stop().catch(() => {});
         ttsQueueRef.current?.interrupt();
         ttsQueueRef.current?.reset();
@@ -128,29 +139,24 @@ export function useVoice(
   }, []);
 
   // ── Push-to-talk ─────────────────────────────────────────────────────────
-  // F2 toggles: first press = start, second press = stop + transcribe + submit
 
   const handleVoiceKey = useCallback(
     (input: string, key: Key): boolean => {
-      // Ink represents F2 as escape sequence \x1b[12~ or the string "F2"
-      // We also check for a common raw sequence. Ink normalises to `key.name`.
       const isF2 =
         (key as any).name === "F2" ||
         input === "\x1b[12~" ||
         input === "\x1bOQ";
-      if (!isF2 || !voiceEnabled) return false;
+      if (!isF2 || !voiceEnabledRef.current) return false;
 
       if (!isRecording) {
-        // ── Start recording ──
         try {
-          const handle = startRecording(config);
+          const handle = startRecording(configRef.current);
           recordingRef.current = handle;
           setIsRecording(true);
         } catch (err: any) {
           setStatusLine(`❌ Record failed: ${err.message}`);
         }
       } else {
-        // ── Stop recording, transcribe, submit ──
         const handle = recordingRef.current;
         if (!handle) {
           setIsRecording(false);
@@ -164,7 +170,10 @@ export function useVoice(
         handle
           .stop()
           .then((wavPath) =>
-            transcribe(wavPath, config).then((text) => ({ wavPath, text })),
+            transcribe(wavPath, configRef.current).then((text) => ({
+              wavPath,
+              text,
+            })),
           )
           .then(({ wavPath, text }) => {
             cleanupRecording(wavPath);
@@ -183,63 +192,85 @@ export function useVoice(
           });
       }
 
-      return true; // key consumed
+      return true;
     },
-    [voiceEnabled, isRecording, config, handleSubmit],
+    [isRecording, handleSubmit],
   );
 
   // ── Streaming TTS via onChunk ─────────────────────────────────────────────
 
+  /**
+   * Returns a wrapped onChunk callback that feeds text into TTS sentence
+   * buffering while also calling the original UI chunk handler.
+   *
+   * BUG FIX 2: Uses `voiceEnabledRef.current` (not the captured `voiceEnabled`
+   * state) so the check is always fresh, even mid-stream.
+   */
   const makeSpeakingOnChunk = useCallback(
-    (
-      originalOnChunk: (chunk: string) => void,
-      onResponseEnd: () => Promise<void>,
-    ) => {
-      if (!voiceEnabled) return originalOnChunk;
+    (originalOnChunk: (chunk: string) => void): ((chunk: string) => void) => {
+      if (!voiceEnabledRef.current) return originalOnChunk;
 
-      // Reset sentence buffer for each new response
       const queue = ttsQueueRef.current!;
       queue.reset();
 
-      const buffer = new SentenceBuffer(config, (sentence) => {
+      const buffer = new SentenceBuffer(configRef.current, (sentence) => {
         queue.push(sentence);
       });
       sentenceBufferRef.current = buffer;
 
       return (chunk: string) => {
         originalOnChunk(chunk);
-        if (voiceEnabled) buffer.push(chunk);
+        // Check ref each time — user may have disabled voice mid-stream
+        if (voiceEnabledRef.current) buffer.push(chunk);
       };
     },
-    [voiceEnabled, config],
+    [], // stable — uses refs only
   );
 
-  // Called by useAgent after the full response is in — flush the last sentence
+  /**
+   * Call after the full agent response is ready.
+   *
+   * BUG FIX 1: Previous implementation always pushed `text` to the queue,
+   * causing double-speech for streaming responses (sentences already queued
+   * via onChunk). Now:
+   *   - wasStreamed=true  → just flush the buffer remainder (last partial sentence)
+   *   - wasStreamed=false → push the full text directly (non-streaming tool response)
+   */
   const speakText = useCallback(
-    async (text: string): Promise<void> => {
-      if (!voiceEnabled) return;
-      // Flush remaining buffer
-      if (sentenceBufferRef.current) {
-        await sentenceBufferRef.current.flush();
-        sentenceBufferRef.current = null;
-      }
-      // If TTS queue is empty (non-streaming tool response), speak directly
-      const queue = ttsQueueRef.current;
-      if (queue && !isSpeaking) {
-        queue.push(text);
+    async (text: string, wasStreamed: boolean): Promise<void> => {
+      if (!voiceEnabledRef.current) return;
+
+      if (wasStreamed) {
+        // Flush the trailing partial sentence from the buffer, if any
+        if (sentenceBufferRef.current) {
+          sentenceBufferRef.current.flush();
+          sentenceBufferRef.current = null;
+        }
+      } else {
+        // Non-streaming: speak the complete response directly
+        const queue = ttsQueueRef.current;
+        if (queue) {
+          queue.reset();
+          queue.push(text);
+        }
       }
     },
-    [voiceEnabled, isSpeaking],
+    [],
   );
 
   const stopSpeaking = useCallback(() => {
     ttsQueueRef.current?.interrupt();
     ttsQueueRef.current?.reset();
+    if (sentenceBufferRef.current) {
+      sentenceBufferRef.current.reset();
+      sentenceBufferRef.current = null;
+    }
   }, []);
 
+  // BUG FIX 3: Stable callback — reads config from ref, no dep on config obj
   const transcribeFile = useCallback(
-    (wavPath: string) => transcribe(wavPath, config),
-    [config],
+    (wavPath: string) => transcribe(wavPath, configRef.current),
+    [],
   );
 
   return {

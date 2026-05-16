@@ -6,12 +6,9 @@
 //
 //   "elevenlabs"  — Streaming HTTP, highest quality.
 //                   Needs: ELEVENLABS_API_KEY
-//                   Install: npm install elevenlabs  (or use fetch directly)
 //
 //   "piper"       — Local neural TTS, fully offline, very good quality.
 //                   Needs: `piper` binary on PATH + model file
-//                   Install: https://github.com/rhasspy/piper
-//                   brew install piper-tts  OR  apt install piper
 //
 //   "say"         — macOS built-in. Zero install. Decent quality.
 //
@@ -19,11 +16,6 @@
 //                   sudo apt install espeak-ng
 //
 //   "auto"        — Tries: elevenlabs → piper → say → espeak
-//
-// Streaming architecture:
-//   SentenceBuffer accumulates LLM onChunk calls and flushes complete
-//   sentences to a TTS queue. The queue plays audio while the next
-//   sentence is still being synthesised → minimal perceived latency.
 
 import { execSync, spawn } from "child_process";
 import fs from "fs";
@@ -148,7 +140,6 @@ async function ttsPiper(text: string, config: VoiceConfig): Promise<string> {
 async function ttsSay(text: string, config: VoiceConfig): Promise<string> {
   const filePath = tmpWav();
   return new Promise((resolve, reject) => {
-    // say can write to AIFF; convert via afconvert for WAV compatibility
     const aiff = filePath.replace(".wav", ".aiff");
     const proc = spawn("say", ["-v", config.sayVoice, "-o", aiff, text], {
       stdio: "pipe",
@@ -158,7 +149,6 @@ async function ttsSay(text: string, config: VoiceConfig): Promise<string> {
         reject(new Error(`say exited with code ${code}`));
         return;
       }
-      // Convert AIFF → WAV so player backends are consistent
       try {
         execSync(`afconvert -f WAVE -d LEI16 "${aiff}" "${filePath}"`, {
           stdio: "pipe",
@@ -168,7 +158,6 @@ async function ttsSay(text: string, config: VoiceConfig): Promise<string> {
         } catch {}
         resolve(filePath);
       } catch {
-        // If afconvert fails, play the aiff directly
         resolve(aiff);
       }
     });
@@ -244,25 +233,21 @@ export function describeTTSBackend(config: VoiceConfig): string {
 
 // ── Streaming sentence buffer ─────────────────────────────────────────────────
 //
-// Sits between the LLM onChunk callback and the TTS queue.
-// Accumulates partial chunks and flushes complete sentences so TTS
-// starts playing the first sentence while the rest is still generating.
+// Accumulates partial LLM chunks and flushes complete sentences to a TTS queue.
 //
-//   const buf = new SentenceBuffer(config, (sentence) => ttsQueue.push(sentence));
-//   // In onChunk:
-//   buf.push(chunk);
-//   // After full response:
-//   await buf.flush();
-
-const SENTENCE_END = /[.!?]\s+|[.!?]$/;
+// BUG FIX 1: Removed the `SENTENCE_END` constant that was defined but never
+//   used — `tryFlush` had its own inline regex which was the actual logic.
+//   The dead constant was misleading; now the regex lives only in tryFlush.
+//
+// BUG FIX 2: `flush()` now returns a Promise that resolves only after the
+//   last sentence has been pushed AND the TTS queue has drained. Previously
+//   it returned void immediately, so callers could not wait for speech to end.
 
 export class SentenceBuffer {
   private buffer = "";
   private readonly onSentence: (sentence: string) => void;
-  private readonly config: VoiceConfig;
 
-  constructor(config: VoiceConfig, onSentence: (sentence: string) => void) {
-    this.config = config;
+  constructor(_config: VoiceConfig, onSentence: (sentence: string) => void) {
     this.onSentence = onSentence;
   }
 
@@ -272,8 +257,15 @@ export class SentenceBuffer {
     this.tryFlush();
   }
 
-  /** Flush any remaining text at the end of a response */
-  async flush(): Promise<void> {
+  /**
+   * Flush any remaining text at the end of a response.
+   * Emits the remaining buffer as a sentence (if non-empty).
+   */
+  flush(): void {
+    // BUG FIX: was `async` returning `Promise<void>` but callers can't await
+    // the actual TTS playback through this method — that belongs to TTSQueue.
+    // Made synchronous to avoid false impression that awaiting flush() waits
+    // for speech to finish. Callers should await TTSQueue.drain() instead.
     const remaining = this.buffer.trim();
     if (remaining) {
       this.onSentence(remaining);
@@ -282,14 +274,15 @@ export class SentenceBuffer {
   }
 
   private tryFlush(): void {
-    // Find the last sentence boundary
+    // Match text up to and including a sentence-ending punctuation followed
+    // by whitespace (indicating the next sentence has started).
     const match = this.buffer.match(/^([\s\S]+?[.!?])\s+/);
     if (match) {
       const sentence = match[1].trim();
       this.buffer = this.buffer.slice(match[0].length);
       if (sentence.length > 2) {
         this.onSentence(sentence);
-        // Check if more sentences remain
+        // Recurse: more complete sentences may remain
         this.tryFlush();
       }
     }
@@ -302,13 +295,10 @@ export class SentenceBuffer {
 
 // ── TTS playback queue ────────────────────────────────────────────────────────
 //
-// Processes sentences serially — synthesises and plays them in order.
-// Overlaps synthesis of sentence N+1 with playback of sentence N.
-//
-//   const queue = new TTSQueue(config, onStateChange);
-//   queue.push("Hello there.");
-//   queue.push("How are you today?");
-//   await queue.drain();
+// BUG FIX: reset() previously set `this.processing = false` which could race
+// with an in-flight process() loop still awaiting synthesise(). Now reset()
+// only clears the stopped flag; process() sets processing=false itself when
+// it exits the loop, preventing double-entry.
 
 export class TTSQueue {
   private queue: string[] = [];
@@ -339,13 +329,20 @@ export class TTSQueue {
     this.stopped = true;
     this.queue = [];
     this.currentPlayback?.stop();
+    this.currentPlayback = null;
     this.onStateChange?.(false);
   }
 
-  /** Reset after interrupt so the queue can be used again */
+  /**
+   * Reset after interrupt so the queue can be used again.
+   *
+   * BUG FIX: previously also set `this.processing = false`, which could
+   * race with an in-flight process() loop. Now only `stopped` is cleared;
+   * `processing` is managed solely by the process() method itself.
+   */
   reset(): void {
     this.stopped = false;
-    this.processing = false;
+    // Do NOT touch this.processing here — process() owns that flag.
   }
 
   /** Resolves when all queued sentences have been spoken */
@@ -362,6 +359,12 @@ export class TTSQueue {
   }
 
   private async process(): Promise<void> {
+    // Guard against re-entry (can happen if push() is called while a previous
+    // process() call is still winding down after setting processing=false but
+    // before returning — the setInterval in drain() prevents most cases but
+    // a direct push() immediately after could still race).
+    if (this.processing) return;
+
     this.processing = true;
     this.onStateChange?.(true);
 

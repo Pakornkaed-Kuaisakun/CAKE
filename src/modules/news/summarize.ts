@@ -1,5 +1,5 @@
 import type { AIProvider } from "../../providers/types.js";
-import type { RawArticle } from "./fetch.js";
+import type { RawArticle } from "./fetchHelper/types.js";
 
 export interface NewsItem {
   title: string;

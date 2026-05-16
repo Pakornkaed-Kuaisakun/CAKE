@@ -1,4 +1,4 @@
-import type { Tool } from "../types.js";
+import type { Tool } from "./types.js";
 
 export const summarizeTool: Tool = async (ctx) => {
   const text = String(ctx.input ?? "");

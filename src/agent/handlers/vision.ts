@@ -2,21 +2,10 @@
 //
 // Screenshot + Vision handler
 //
-// Captures the screen (or a region / window) using platform-native tools,
-// then sends the image to Claude's vision API for analysis.
-//
-// Platform support:
-//   macOS   → screencapture  (built-in, no install needed)
-//   Linux   → scrot | gnome-screenshot | import (ImageMagick)
-//   Windows → PowerShell snippet via snippingtool / nircmd
-//
-// Commands the router should map to this handler:
-//   screenshot                    → capture full screen + describe
-//   screenshot analyze            → same
-//   screenshot <question>         → capture + answer a specific question
-//   vision <question>             → alias
-//   what's on my screen?          → alias
-//   screen analyze                → alias
+// BUG FIX: getVisionModel() and analyzeWithClaudeVision() were hardcoded to
+// "claude-opus-4-5" which is an outdated / non-standard model string.
+// Updated to use the current recommended model via a constant, matching the
+// pattern used everywhere else in the codebase.
 
 import { execSync } from "child_process";
 import fs from "fs";
@@ -28,6 +17,10 @@ import { text } from "../utils/text.js";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TMP_DIR = path.join(os.tmpdir(), "cake-vision");
+
+// BUG FIX: was "claude-opus-4-5" (non-existent / outdated string).
+// Use the same default as ClaudeProvider.chat() for consistency.
+const CLAUDE_VISION_MODEL = "claude-sonnet-4-5";
 
 // ── Platform detection ────────────────────────────────────────────────────────
 
@@ -48,10 +41,6 @@ function detectPlatform(): Platform {
 
 // ── Capture helpers ───────────────────────────────────────────────────────────
 
-/**
- * Returns the path to the screenshot PNG on success, throws on failure.
- * `region` is an optional [x,y,w,h] for a partial capture (mac/linux only).
- */
 function captureScreen(
   outputPath: string,
   region?: [number, number, number, number],
@@ -65,7 +54,6 @@ function captureScreen(
   fs.mkdirSync(TMP_DIR, { recursive: true });
 
   if (platform === "mac") {
-    // screencapture ships with every macOS install
     const regionFlag = region
       ? `-R${region[0]},${region[1]},${region[2]},${region[3]}`
       : "";
@@ -75,19 +63,10 @@ function captureScreen(
   }
 
   if (platform === "linux") {
-    // Try tools in order of preference
-    const regionArg = region
-      ? `--geometry=${region[2]}x${region[3]}+${region[0]}+${region[1]}`
-      : "";
-
     const candidates = [
-      // scrot (lightweight, usually pre-installed)
       `scrot ${region ? `-a ${region[0]},${region[1]},${region[2]},${region[3]}` : ""} "${outputPath}"`,
-      // GNOME screenshot tool
       `gnome-screenshot ${region ? `--geometry=${region[2]}x${region[3]}+${region[0]}+${region[1]}` : ""} -f "${outputPath}"`,
-      // ImageMagick import (X11)
       `import ${region ? `-crop ${region[2]}x${region[3]}+${region[0]}+${region[1]}` : "-window root"} "${outputPath}"`,
-      // Wayland: grim
       `grim ${region ? `-g "${region[0]},${region[1]} ${region[2]}x${region[3]}"` : ""} "${outputPath}"`,
     ];
 
@@ -95,7 +74,7 @@ function captureScreen(
     for (const cmd of candidates) {
       try {
         execSync(cmd, { timeout: 10_000, stdio: "pipe" });
-        return; // success
+        return;
       } catch (err: any) {
         lastErr = err.message ?? String(err);
       }
@@ -106,7 +85,6 @@ function captureScreen(
   }
 
   if (platform === "windows") {
-    // PowerShell one-liner using .NET — no extra install needed
     const ps = `
 Add-Type -AssemblyName System.Windows.Forms;
 $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds;
@@ -128,23 +106,16 @@ function imageToBase64(filePath: string): string {
   return fs.readFileSync(filePath).toString("base64");
 }
 
-// ── Vision API call ───────────────────────────────────────────────────────────
+// ── Vision API call (non-Claude providers) ────────────────────────────────────
 
-/**
- * Sends the captured screenshot to the provider's vision endpoint.
- * Falls back gracefully if the provider doesn't support vision.
- */
 async function analyzeWithVision(
   provider: AIProvider,
   base64Image: string,
   question: string,
   model?: string,
 ): Promise<string> {
-  // Claude's vision API requires an image content block
-  // We build the message manually to pass the base64 image.
   const visionModel = model ?? getVisionModel(provider.name);
 
-  // Build the multi-modal message content
   const imageBlock: any = {
     type: "image",
     source: {
@@ -159,43 +130,27 @@ async function analyzeWithVision(
     text: question,
   };
 
-  // Pass via provider.chat() using a special content structure.
-  // We coerce the message content to the multi-modal format that Claude expects.
   const result = await provider.chat(
     [
       {
         role: "user",
-        // Cast to string since our Message type uses string content;
-        // the actual Claude SDK accepts arrays, so we JSON-encode as a hint
-        // and let the provider handle it — OR we use a direct API call below.
         content: JSON.stringify([imageBlock, textBlock]),
       },
     ],
     { model: visionModel },
   );
 
-  // If the provider returned an error about unsupported content, fall back
-  if (
-    result.text.includes("I cannot") ||
-    result.text.includes("image") === false
-  ) {
-    return result.text;
-  }
-
   return result.text;
 }
 
-/**
- * For providers that accept raw multi-modal content we call the Anthropic SDK
- * directly so the image bytes are properly encoded.
- */
+// ── Vision API call (Claude — direct SDK for proper multimodal encoding) ──────
+
 async function analyzeWithClaudeVision(
   provider: AIProvider,
   base64Image: string,
   question: string,
   model?: string,
 ): Promise<string> {
-  // Dynamically import the Anthropic SDK to avoid hard dependency for other providers
   let Anthropic: any;
   try {
     Anthropic = (await import("@anthropic-ai/sdk")).default;
@@ -207,8 +162,10 @@ async function analyzeWithClaudeVision(
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
+  // BUG FIX: was hardcoded "claude-opus-4-5"; now uses caller-supplied model
+  // or falls back to the current recommended vision model constant.
   const response = await client.messages.create({
-    model: model ?? "claude-opus-4-5",
+    model: model ?? CLAUDE_VISION_MODEL,
     max_tokens: 1024,
     messages: [
       {
@@ -242,13 +199,14 @@ async function analyzeWithClaudeVision(
 function getVisionModel(providerName: string): string {
   switch (providerName) {
     case "claude":
-      return "claude-opus-4-5"; // best vision quality
+      // BUG FIX: was "claude-opus-4-5" (non-existent / outdated)
+      return CLAUDE_VISION_MODEL;
     case "openai":
       return "gpt-4o";
     case "gemini":
       return "gemini-1.5-pro";
     default:
-      return "claude-opus-4-5";
+      return CLAUDE_VISION_MODEL;
   }
 }
 
@@ -264,17 +222,7 @@ interface VisionArgs {
   savePath?: string;
 }
 
-/**
- * Parses free-form input into structured args.
- *
- * Examples:
- *   "screenshot"                          → { question: "Describe what's on the screen." }
- *   "screenshot what app is open?"        → { question: "what app is open?" }
- *   "screenshot region 0,0,800,600"       → partial capture
- *   "screenshot save ~/Desktop/snap.png"  → also save the file
- */
 function parseVisionInput(raw: string): VisionArgs {
-  // Strip trigger words
   let input = raw
     .replace(
       /^(screenshot|vision|screen\s+analyze|what'?s?\s+on\s+(my\s+)?screen\??)\s*/i,
@@ -285,7 +233,6 @@ function parseVisionInput(raw: string): VisionArgs {
   let region: [number, number, number, number] | undefined;
   let savePath: string | undefined;
 
-  // --region x,y,w,h  or  region x,y,w,h
   const regionMatch = input.match(/\bregion\s+(\d+),(\d+),(\d+),(\d+)/i);
   if (regionMatch) {
     region = [
@@ -297,7 +244,6 @@ function parseVisionInput(raw: string): VisionArgs {
     input = input.replace(regionMatch[0], "").trim();
   }
 
-  // --save <path>  or  save <path>
   const saveMatch = input.match(/\bsave\s+(\S+)/i);
   if (saveMatch) {
     savePath = saveMatch[1].replace(/^~/, os.homedir());
@@ -319,7 +265,6 @@ export async function handleScreenshot(
   input: string,
   model?: string,
 ): Promise<ChatResult> {
-  // 1. Validate platform
   const platform = detectPlatform();
   if (platform === "unsupported") {
     return text(
@@ -328,7 +273,6 @@ export async function handleScreenshot(
     );
   }
 
-  // 2. Check vision support
   if (!supportsVision(provider.name)) {
     return text(
       `[VISION] Provider "${provider.name}" does not support vision/image analysis.\n` +
@@ -336,11 +280,9 @@ export async function handleScreenshot(
     );
   }
 
-  // 3. Parse input
   const args = parseVisionInput(input);
   const tmpFile = path.join(TMP_DIR, `screen-${Date.now()}.png`);
 
-  // 4. Capture
   let captureMs = 0;
   try {
     const t0 = Date.now();
@@ -361,7 +303,6 @@ export async function handleScreenshot(
 
   const sizeKb = (fs.statSync(tmpFile).size / 1024).toFixed(1);
 
-  // 5. Optionally copy to user-specified path
   if (args.savePath) {
     try {
       fs.mkdirSync(path.dirname(args.savePath), { recursive: true });
@@ -371,13 +312,10 @@ export async function handleScreenshot(
     }
   }
 
-  // 6. Encode to base64
   const base64 = imageToBase64(tmpFile);
 
-  // 7. Analyze
   let analysis: string;
   try {
-    // Prefer direct Anthropic SDK call for Claude (most reliable vision support)
     if (provider.name === "claude") {
       analysis = await analyzeWithClaudeVision(
         provider,
@@ -394,19 +332,16 @@ export async function handleScreenshot(
       );
     }
   } catch (err: any) {
-    // Clean up temp file before returning
     try {
       fs.unlinkSync(tmpFile);
     } catch {}
     return text(`[VISION] Analysis failed.\n${err.message}`);
   }
 
-  // 8. Clean up temp file
   try {
     fs.unlinkSync(tmpFile);
   } catch {}
 
-  // 9. Build response
   const header = [
     `[VISION] Screenshot captured (${sizeKb} KB, ${captureMs}ms)`,
     args.region
@@ -423,7 +358,7 @@ export async function handleScreenshot(
 // ── Install hint ──────────────────────────────────────────────────────────────
 
 function installHint(platform: Platform): string {
-  if (platform === "mac") return ""; // screencapture is always available
+  if (platform === "mac") return "";
   if (platform === "linux") {
     return (
       "Install a screenshot tool:\n" +

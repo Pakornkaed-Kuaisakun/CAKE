@@ -66,7 +66,7 @@ export interface RecordingHandle {
   /** Stop recording and resolve with the final file path */
   stop(): Promise<string>;
   /** True while the subprocess is still running */
-  readonly isRecording: boolean;
+  isRecording: boolean; // BUG FIX: mutable property, not readonly accessor
 }
 
 // ── Push-to-talk: manual start/stop ──────────────────────────────────────────
@@ -74,6 +74,10 @@ export interface RecordingHandle {
 /**
  * Start recording immediately. Call handle.stop() when the user releases
  * the push-to-talk key.
+ *
+ * BUG FIX: `isRecording` was declared as `readonly isRecording: _isRecording`
+ * which captured the primitive VALUE at creation time (always true).
+ * Now it's a plain mutable property on the returned object, updated on exit.
  */
 export function startRecording(
   config: Pick<VoiceConfig, "maxRecordSeconds">,
@@ -91,10 +95,37 @@ export function startRecording(
 
   const filePath = tmpWav();
   let proc: ChildProcess;
-  let _isRecording = true;
+
+  // BUG FIX: use a plain object so isRecording is a real mutable field
+  const handle: RecordingHandle = {
+    filePath,
+    isRecording: true,
+    stop(): Promise<string> {
+      return new Promise((resolve, reject) => {
+        if (!handle.isRecording) {
+          // Already stopped — just resolve if file exists
+          if (fs.existsSync(filePath) && fs.statSync(filePath).size > 1000) {
+            resolve(filePath);
+          } else {
+            reject(new Error("Recording produced no audio (file too small)."));
+          }
+          return;
+        }
+        proc.once("exit", () => {
+          handle.isRecording = false;
+          if (fs.existsSync(filePath) && fs.statSync(filePath).size > 1000) {
+            resolve(filePath);
+          } else {
+            reject(new Error("Recording produced no audio (file too small)."));
+          }
+        });
+        // SIGINT lets sox flush WAV headers properly; SIGTERM for others
+        proc.kill(backend === "sox" ? "SIGINT" : "SIGTERM");
+      });
+    },
+  };
 
   if (backend === "sox") {
-    // sox rec: 16kHz mono WAV, max duration guard
     proc = spawn(
       "rec",
       [
@@ -152,32 +183,10 @@ export function startRecording(
   }
 
   proc.on("exit", () => {
-    _isRecording = false;
+    handle.isRecording = false;
   });
 
-  return {
-    filePath,
-    isRecording: _isRecording,
-    stop(): Promise<string> {
-      return new Promise((resolve, reject) => {
-        if (!_isRecording) {
-          resolve(filePath);
-          return;
-        }
-        proc.once("exit", (code) => {
-          _isRecording = false;
-          // Any exit is fine for push-to-talk — we killed it intentionally
-          if (fs.existsSync(filePath) && fs.statSync(filePath).size > 1000) {
-            resolve(filePath);
-          } else {
-            reject(new Error("Recording produced no audio (file too small)."));
-          }
-        });
-        // SIGINT lets sox flush headers properly; SIGTERM for others
-        proc.kill(backend === "sox" ? "SIGINT" : "SIGTERM");
-      });
-    },
-  };
+  return handle;
 }
 
 // ── Auto-stop: silence detection (sox only) ───────────────────────────────────
@@ -201,7 +210,6 @@ export function recordUntilSilence(
     const filePath = tmpWav();
 
     if (backend === "sox") {
-      // sox silence effect: stop after `silenceTimeout` seconds of < 1% volume
       const proc = spawn(
         "rec",
         [

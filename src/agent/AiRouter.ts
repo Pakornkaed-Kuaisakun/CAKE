@@ -4,7 +4,7 @@
 // be resolved by the zero-latency pre-classifier or the regex route table.
 //
 // Design goals:
-//   • Deterministic  → temperature 0, maxTokens 10 (single word answer)
+//   • Deterministic  → temperature 0, maxTokens 20 (longest intent is 14 chars)
 //   • Compact prompt → cheaper, faster, less hallucination
 //   • Few-shot       → prevents the model from writing explanations
 //   • Validated      → strips stray whitespace/punctuation from reply
@@ -123,7 +123,8 @@ EXAMPLES (input → intent):
 "how are you?" → chat
 "what's on my screen?" → screenshot
 "screenshot what app is open?" → screenshot
-"analyze my screen" → screenshot`;
+"analyze my screen" → screenshot
+"clear all my todos" → todo_remove_all`;
 
 export async function aiIntentRouter(
   provider: AIProvider,
@@ -142,8 +143,10 @@ export async function aiIntentRouter(
     {
       model: fastModel,
       systemPrompt: SYSTEM_PROMPT,
-      temperature: 0, // fully deterministic
-      maxTokens: 12, // intent name is at most ~20 chars
+      temperature: 0,
+      // BUG FIX: was 12, but longest intent name is "todo_remove_all" = 14 chars.
+      // Raised to 20 to guarantee no truncation for any current or future intent.
+      maxTokens: 20,
     },
   );
 
