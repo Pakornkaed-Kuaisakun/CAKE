@@ -73,9 +73,9 @@ export async function loadAllPlugins(
       }
 
       loaded.push({ ...exported, filePath });
-      const msg = `[plugins] Loaded: ${exported.name} (${path.basename(filePath)})`;
-      if (onLog) onLog(msg);
-      else console.log(msg);
+      // const msg = `[plugins] Loaded: ${exported.name} (${path.basename(filePath)})`;
+      // if (onLog) onLog(msg);
+      // else console.log(msg);
     } catch (err: any) {
       const msg = `[plugins] Failed to load "${path.basename(filePath)}": ${err.message}`;
       if (onLog) onLog(msg);

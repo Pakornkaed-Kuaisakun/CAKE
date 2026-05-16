@@ -47,13 +47,13 @@ function tmpWav(): string {
 
 // ── Backend detection ─────────────────────────────────────────────────────────
 
-type TTSBackend = "elevenlabs" | "piper" | "say" | "espeak" | "none";
+type TTSBackend = "elevenlabs" | "piper" | "say" | "espeak" | "sapi" | "none";
 
 function detectTTSBackend(preference: VoiceConfig["ttsBackend"]): TTSBackend {
   const order: TTSBackend[] =
     preference !== "auto"
       ? [preference as TTSBackend]
-      : ["elevenlabs", "piper", "say", "espeak"];
+      : ["elevenlabs", "piper", "sapi", "say", "espeak"];
 
   for (const b of order) {
     if (b === "elevenlabs" && process.env.ELEVENLABS_API_KEY)
@@ -64,6 +64,7 @@ function detectTTSBackend(preference: VoiceConfig["ttsBackend"]): TTSBackend {
         return "piper";
       } catch {}
     }
+    if (b === "sapi" && process.platform === "win32") return "sapi";
     if (b === "say" && process.platform === "darwin") return "say";
     if (b === "espeak") {
       try {
@@ -179,6 +180,44 @@ async function ttsEspeak(text: string): Promise<string> {
   });
 }
 
+async function ttsWindowsSapi(
+  text: string,
+  config: VoiceConfig,
+): Promise<string> {
+  const filePath = tmpWav();
+  return new Promise((resolve, reject) => {
+    // Use PowerShell's built-in SpeechSynthesizer to write a WAV file
+    const ps = `
+Add-Type -AssemblyName System.Speech;
+$synth = New-Object System.Speech.Synthesis.SpeechSynthesizer;
+$synth.SetOutputToWaveFile('${filePath.replace(/\\/g, "\\\\").replace(/'/g, "''")}');
+$synth.Speak('${text.replace(/'/g, "''").replace(/\\/g, "\\\\").slice(0, 500)}');
+$synth.Dispose();
+`.trim();
+
+    const proc = spawn(
+      "powershell",
+      ["-NoProfile", "-NonInteractive", "-Command", ps],
+      {
+        stdio: "pipe",
+      },
+    );
+
+    proc.once("exit", (code) => {
+      if (
+        code === 0 &&
+        fs.existsSync(filePath) &&
+        fs.statSync(filePath).size > 1000
+      ) {
+        resolve(filePath);
+      } else {
+        reject(new Error(`Windows SAPI exited with code ${code}`));
+      }
+    });
+    proc.once("error", reject);
+  });
+}
+
 // ── Public synth ──────────────────────────────────────────────────────────────
 
 /**
@@ -199,6 +238,8 @@ export async function synthesise(
       return ttsElevenLabs(trimmed, config);
     case "piper":
       return ttsPiper(trimmed, config);
+    case "sapi":
+      return ttsWindowsSapi(trimmed, config);
     case "say":
       return ttsSay(trimmed, config);
     case "espeak":
@@ -208,9 +249,10 @@ export async function synthesise(
         "No TTS backend available.\n" +
           "Options:\n" +
           "  1. Set ELEVENLABS_API_KEY  (best quality)\n" +
-          "  2. Install piper: brew install piper-tts  |  apt install piper\n" +
-          "  3. macOS: say is built-in (set CAKE_TTS=say)\n" +
-          "  4. Linux: sudo apt install espeak-ng",
+          "  2. Install piper\n" +
+          "  3. macOS: say is built-in\n" +
+          "  4. Linux: sudo apt install espeak-ng\n" +
+          "  5. Windows: PowerShell/SAPI should auto-detect",
       );
   }
 }

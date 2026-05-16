@@ -78,11 +78,11 @@ export class CakeAgent {
     loadAllPlugins(onLog)
       .then((plugins) => {
         registerPlugins(plugins);
-        if (plugins.length > 0) {
-          const msg = `[plugins] ${plugins.length} plugin(s) ready.`;
-          if (onLog) onLog(msg);
-          else console.log(msg);
-        }
+        // if (plugins.length > 0) {
+        //   const msg = `[plugins] ${plugins.length} plugin(s) ready.`;
+        //   if (onLog) onLog(msg);
+        //   else console.log(msg);
+        // }
       })
       .catch((err) => {
         const msg = `[plugins] Plugin load error: ${err.message}`;

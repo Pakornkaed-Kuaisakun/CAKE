@@ -26,7 +26,7 @@ export interface VoiceConfig {
   /** Whether voice mode is active this session */
   enabled: boolean;
   /** TTS backend to use */
-  ttsBackend: "elevenlabs" | "piper" | "say" | "espeak" | "auto";
+  ttsBackend: "elevenlabs" | "piper" | "sapi" | "say" | "espeak" | "auto";
   /** ElevenLabs voice ID (default: Rachel) */
   elevenLabsVoiceId: string;
   /** Piper model path or name */

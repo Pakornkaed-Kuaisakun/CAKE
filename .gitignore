@@ -13,3 +13,5 @@ node_modules
 dist
 .vscode
 /reports
+
+ggml-base.en.bin

@@ -36,6 +36,7 @@ import {
   type VoiceConfig,
 } from "../../modules/voice/index.js";
 import type { RecordingHandle } from "../../modules/voice/recorder.js";
+import { useRawF2 } from "./useRawKey.js";
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ export function useVoice(
   const recordingRef = useRef<RecordingHandle | null>(null);
   const ttsQueueRef = useRef<TTSQueue | null>(null);
   const sentenceBufferRef = useRef<SentenceBuffer | null>(null);
+  const isRecordingRef = useRef(false);
 
   // Initialise TTSQueue once
   useEffect(() => {
@@ -104,6 +106,10 @@ export function useVoice(
     };
   }, []); // intentionally empty — TTSQueue is a singleton for this hook instance
 
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+  }, [isRecording]);
+
   // Update status line whenever state changes
   useEffect(() => {
     if (!voiceEnabled) {
@@ -111,7 +117,7 @@ export function useVoice(
       return;
     }
     if (isRecording) {
-      setStatusLine("🎙  Recording… press F2 to stop");
+      setStatusLine("🎙 Recording… press F2 to stop");
       return;
     }
     if (isSpeaking) {
@@ -119,7 +125,7 @@ export function useVoice(
       return;
     }
     setStatusLine(
-      `🎤 Voice ON · STT: ${describeSTTBackend()} · TTS: ${describeTTSBackend(configRef.current)}`,
+      `Voice ON · STT: ${describeSTTBackend()} · TTS: ${describeTTSBackend(configRef.current)}`,
     );
   }, [voiceEnabled, isRecording, isSpeaking]);
 
@@ -140,62 +146,61 @@ export function useVoice(
 
   // ── Push-to-talk ─────────────────────────────────────────────────────────
 
-  const handleVoiceKey = useCallback(
-    (input: string, key: Key): boolean => {
-      const isF2 =
-        (key as any).name === "F2" ||
-        input === "\x1b[12~" ||
-        input === "\x1bOQ";
-      if (!isF2 || !voiceEnabledRef.current) return false;
+  // Raw F2 detection (bypasses Ink's broken Windows key parser)
+  useRawF2(() => {
+    if (!voiceEnabledRef.current) return;
 
-      if (!isRecording) {
-        try {
-          const handle = startRecording(configRef.current);
-          recordingRef.current = handle;
-          setIsRecording(true);
-        } catch (err: any) {
-          setStatusLine(`❌ Record failed: ${err.message}`);
-        }
-      } else {
-        const handle = recordingRef.current;
-        if (!handle) {
-          setIsRecording(false);
-          return true;
-        }
-
-        recordingRef.current = null;
+    if (!isRecordingRef.current) {
+      try {
+        const handle = startRecording(configRef.current);
+        recordingRef.current = handle;
+        setIsRecording(true);
+      } catch (err: any) {
+        setStatusLine(`❌ Record failed: ${err.message}`);
+      }
+    } else {
+      const handle = recordingRef.current;
+      if (!handle) {
         setIsRecording(false);
-        setStatusLine("⏳ Transcribing…");
-
-        handle
-          .stop()
-          .then((wavPath) =>
-            transcribe(wavPath, configRef.current).then((text) => ({
-              wavPath,
-              text,
-            })),
-          )
-          .then(({ wavPath, text }) => {
-            cleanupRecording(wavPath);
-            const trimmed = text.trim();
-            if (trimmed) {
-              setStatusLine(
-                `🗣  "${trimmed.slice(0, 60)}${trimmed.length > 60 ? "…" : ""}"`,
-              );
-              handleSubmit(trimmed);
-            } else {
-              setStatusLine("❓ No speech detected. Try again (F2).");
-            }
-          })
-          .catch((err: any) => {
-            setStatusLine(`❌ Transcription failed: ${err.message}`);
-          });
+        return;
       }
 
-      return true;
-    },
-    [isRecording, handleSubmit],
-  );
+      recordingRef.current = null;
+      setIsRecording(false);
+      setStatusLine("⏳ Transcribing…");
+
+      handle
+        .stop()
+        .then((wavPath) =>
+          transcribe(wavPath, configRef.current).then((text) => ({
+            wavPath,
+            text,
+          })),
+        )
+        .then(({ wavPath, text }) => {
+          cleanupRecording(wavPath);
+          const trimmed = text.trim();
+          if (trimmed) {
+            setStatusLine(
+              `🗣  "${trimmed.slice(0, 60)}${trimmed.length > 60 ? "…" : ""}"`,
+            );
+            handleSubmit(trimmed);
+          } else {
+            setStatusLine("❓ No speech detected. Try again (F2).");
+          }
+        })
+        .catch((err: any) => {
+          setStatusLine(`❌ Transcription failed: ${err.message}`);
+        });
+    }
+  });
+
+  // Keep handleVoiceKey for App.tsx compatibility but it now only handles
+  // the "stop speaking on any key" logic — F2 is handled by useRawF2 above.
+  const handleVoiceKey = useCallback((_input: string, _key: Key): boolean => {
+    // F2 is now handled via raw stdin in useRawF2 — nothing to do here.
+    return false;
+  }, []);
 
   // ── Streaming TTS via onChunk ─────────────────────────────────────────────
 
