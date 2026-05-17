@@ -665,6 +665,25 @@ export function useAgent() {
             }
             return;
           }
+          case "mode": {
+            const sub = args[0]?.toLowerCase();
+            if (sub === "debug") {
+              const debugEnabled = process.env.CAKE_DEBUG !== "true";
+              process.env.CAKE_DEBUG = debugEnabled ? "true" : "false";
+              addMsg(
+                "system",
+                debugEnabled
+                  ? "⚙️ Debug mode is now ON. Force thinking/reasoning and verbose AI responses are active."
+                  : "⚙️ Debug mode is now OFF. Standard concise responses.",
+              );
+            } else {
+              addMsg(
+                "system",
+                `Current Mode:\n  Debug: ${process.env.CAKE_DEBUG === "true" ? "ON" : "OFF"}\n\nUsage:\n  /mode debug  — toggle AI debug response mode`,
+              );
+            }
+            return;
+          }
 
           default:
             addMsg("system", `Unknown command: ${trimmed}. Type /help.`);
@@ -714,6 +733,22 @@ export function useAgent() {
         stopTimer();
         checkEmbedWarning();
         accumulateUsage(resp.usage);
+
+        if (process.env.CAKE_DEBUG === "true" && resp.usage) {
+          const u = resp.usage;
+          addMsg(
+            "system",
+            `🔧 DEBUG RESPONSE STATS:\n` +
+              `  Time Elapsed   : ${(finalTime / 1000).toFixed(2)}s\n` +
+              `  Prompt Tokens  : ${u.inputTokens.toLocaleString()}` +
+              (u.cachedTokens
+                ? ` (${u.cachedTokens.toLocaleString()} cached)`
+                : "") +
+              `\n` +
+              `  Output Tokens  : ${u.outputTokens.toLocaleString()}\n` +
+              `  Cost (USD)     : $${(u.costUsd || 0).toFixed(5)}`,
+          );
+        }
 
         // Determine if the response was streamed (content already in message)
         // or came back as a single tool result (placeholder still empty).

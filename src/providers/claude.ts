@@ -363,7 +363,6 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
     let out = 0;
     let cacheWrite = 0;
     let cacheRead = 0;
-    let inThinkingBlock = false;
 
     const streamResponse = await this.client.messages.stream(
       requestBody as any,
@@ -376,31 +375,19 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
     );
 
     for await (const event of streamResponse) {
-      // Track block type for thinking vs text
-      if (event.type === "content_block_start") {
-        inThinkingBlock = (event as any).content_block?.type === "thinking";
-      }
-      if (event.type === "content_block_stop") {
-        inThinkingBlock = false;
-      }
-      if (
-        event.type === "content_block_delta" &&
-        event.delta.type === "text_delta"
-      ) {
-        const chunk = event.delta.text;
-        if (inThinkingBlock) {
-          thinkingText += chunk;
-        } else {
+      if (event.type === "content_block_delta") {
+        const deltaType = (event.delta as any).type;
+
+        if (deltaType === "text_delta") {
+          // text_delta is ALWAYS visible response text — never thinking content.
+          // The SDK emits thinking_delta (not text_delta) for thinking blocks.
+          const chunk = (event.delta as any).text as string;
           fullText += chunk;
           onChunk(chunk);
+        } else if (deltaType === "thinking_delta") {
+          // thinking_delta is ONLY emitted when extended thinking is active.
+          thinkingText += (event.delta as any).thinking ?? "";
         }
-      }
-      // thinking_delta (from extended thinking stream)
-      if (
-        event.type === "content_block_delta" &&
-        (event.delta as any).type === "thinking_delta"
-      ) {
-        thinkingText += (event.delta as any).thinking ?? "";
       }
     }
 

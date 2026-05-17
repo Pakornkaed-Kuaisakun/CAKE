@@ -260,4 +260,5 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/voice on", description: "Enable voice mode (F2 push-to-talk)" },
   { command: "/voice off", description: "Disable voice mode" },
   { command: "/voice status", description: "Show STT/TTS backend info" },
+  { command: "/mode debug", description: "Toggle debug mode to show all raw AI outputs" },
 ];

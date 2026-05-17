@@ -176,7 +176,18 @@ export class OpenAIProvider implements AIProvider, BatchProvider {
       signal: options.signal,
     });
 
-    const text = response.choices[0]?.message?.content ?? "";
+    const rawText = response.choices[0]?.message?.content ?? "";
+    const thinkingText =
+      (response.choices[0]?.message as any)?.reasoning ??
+      (response.choices[0]?.message as any)?.reasoning_content ??
+      "";
+
+    let text = rawText;
+    if (thinkingText && thinking?.enabled) {
+      text = `<think>\n${thinkingText}\n</think>\n\n${rawText}`;
+    } else if (!text && thinkingText) {
+      text = `<think>\n${thinkingText}\n</think>`;
+    }
     const inp = response.usage?.prompt_tokens ?? 0;
     const out = response.usage?.completion_tokens ?? 0;
     const cached =
@@ -241,13 +252,34 @@ export class OpenAIProvider implements AIProvider, BatchProvider {
     );
 
     let fullText = "";
+    let thinkingText = "";
     let inp = 0;
     let out = 0;
     let cached = 0;
+    let startedThinking = false;
 
     for await (const chunk of streamResponse) {
       const delta = chunk.choices[0]?.delta?.content;
+      const reasoningDelta =
+        (chunk.choices[0]?.delta as any)?.reasoning ??
+        (chunk.choices[0]?.delta as any)?.reasoning_content;
+
+      if (reasoningDelta) {
+        thinkingText += reasoningDelta;
+        if (thinking?.enabled) {
+          if (!startedThinking) {
+            startedThinking = true;
+            onChunk("<think>\n");
+          }
+          onChunk(reasoningDelta);
+        }
+      }
+
       if (delta) {
+        if (startedThinking) {
+          startedThinking = false;
+          onChunk("\n</think>\n\n");
+        }
         fullText += delta;
         onChunk(delta);
       }
@@ -258,8 +290,20 @@ export class OpenAIProvider implements AIProvider, BatchProvider {
       }
     }
 
+    if (startedThinking) {
+      onChunk("\n</think>\n");
+    }
+
+    let text = fullText;
+    if (thinkingText && thinking?.enabled) {
+      text = `<think>\n${thinkingText}\n</think>\n\n${fullText}`;
+    } else if (!text && thinkingText) {
+      text = `<think>\n${thinkingText}\n</think>`;
+    }
+
     return {
-      text: fullText,
+      text,
+      thinking: thinkingText || undefined,
       usage: {
         inputTokens: inp,
         outputTokens: out,

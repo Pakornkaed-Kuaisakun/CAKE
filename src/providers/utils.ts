@@ -15,9 +15,7 @@ export function getFastModel(provider: ProviderName): string | undefined {
     case "ollama":
       return "qwen2.5:3b";
     case "openrouter":
-      return (
-        process.env.OPENROUTER_FAST_MODEL ?? "deepseek/deepseek-v4-flash:free"
-      );
+      return "nvidia/nemotron-3-nano-30b-a3b:free";
     default:
       return undefined;
   }

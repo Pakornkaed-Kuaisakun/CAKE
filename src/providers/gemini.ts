@@ -112,8 +112,16 @@ function buildThinkingConfig(thinking: NonNullable<ChatOptions["thinking"]>): {
 }
 
 /**
- * Extract text and thinking parts from Gemini response candidates.
- * Thinking parts have `thought: true` in the Gemini API response.
+ * Extract text and thinking parts from a Gemini response object.
+ *
+ * Gemini 2.5 Flash/Pro think by default even without explicit thinkingConfig.
+ * Thought parts carry `thought: true`; visible response parts do not.
+ * We ALWAYS split by this flag so thought tokens never bleed into the
+ * returned text — regardless of whether thinking was explicitly enabled.
+ *
+ * Falls back to `response.text()` (SDK helper) only when the candidates
+ * structure is absent (e.g. older SDK versions or non-2.5 models that
+ * never emit thought parts).
  */
 function extractGeminiContent(response: any): {
   text: string;
@@ -123,20 +131,26 @@ function extractGeminiContent(response: any): {
   let thinking = "";
 
   try {
-    const parts = response.candidates?.[0]?.content?.parts ?? [];
-    for (const part of parts) {
-      if (part.thought === true) {
-        thinking += part.text ?? "";
-      } else {
-        text += part.text ?? "";
+    const parts: any[] = response.candidates?.[0]?.content?.parts ?? [];
+
+    if (parts.length > 0) {
+      for (const part of parts) {
+        if (part.thought === true) {
+          thinking += part.text ?? "";
+        } else {
+          text += part.text ?? "";
+        }
       }
+      // If all parts were thought parts (edge case), fall back to SDK helper
+      if (!text) text = response.text?.() ?? "";
+      return { text, thinking };
     }
   } catch {
-    // Fall back to standard text extraction
-    text = response.text?.() ?? "";
+    // fall through to SDK helper below
   }
 
-  return { text: text || response.response?.text?.() || "", thinking };
+  // No candidates structure — use the SDK's text() helper (safe for non-2.5 models)
+  return { text: response.text?.() ?? "", thinking: "" };
 }
 
 // ── Batch helpers ─────────────────────────────────────────────────────────────
@@ -211,17 +225,12 @@ export class GeminiProvider implements AIProvider, BatchProvider {
       signal: options.signal,
     } as any);
 
-    // Extract thinking if enabled
-    let text: string;
-    let thinkingText = "";
-
-    if (thinkingCfg) {
-      const extracted = extractGeminiContent(result.response);
-      text = extracted.text;
-      thinkingText = extracted.thinking;
-    } else {
-      text = result.response.text();
-    }
+    // Always use extractGeminiContent — Gemini 2.5 models think by default
+    // even without explicit thinkingConfig, and response.text() includes
+    // thought tokens in its output on some SDK versions.
+    const { text, thinking: thinkingText } = extractGeminiContent(
+      result.response,
+    );
 
     const meta = result.response.usageMetadata;
     const inp = meta?.promptTokenCount ?? 0;

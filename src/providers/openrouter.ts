@@ -40,7 +40,7 @@ import type {
 const FREE_FALLBACKS = [
   "openai/gpt-oss-20b:free",
   "deepseek/deepseek-v4-flash:free",
-  "baidu/qianfan-ocr-fast:free",
+  "nvidia/nemotron-3-nano-30b-a3b:free",
   "google/gemma-4-26b-a4b-it:free",
   "qwen/qwen3-next-80b-a3b-instruct:free",
 ];
@@ -223,15 +223,37 @@ export class OpenRouterProvider implements AIProvider, BatchProvider {
           ...thinkingBody,
         };
 
-        // Don't set temperature for reasoning models (they don't support it)
-        if (!useReasoning) requestBody.temperature = temperature;
+        // DeepSeek/reasoning models require include_reasoning to not strip reasoning tokens
+        const isReasoning =
+          m.includes("deepseek") ||
+          m.includes("r1") ||
+          m.includes("qwq") ||
+          isReasoningModel(m);
+
+        if (isReasoning) {
+          requestBody.include_reasoning = true;
+        } else {
+          requestBody.temperature = temperature;
+        }
 
         const response = await this.client.chat.completions.create(
           requestBody,
           { signal },
         );
 
-        const text = response.choices[0]?.message?.content ?? "";
+        const rawText = response.choices[0]?.message?.content ?? "";
+        const thinkingText =
+          (response.choices[0]?.message as any)?.reasoning ??
+          (response.choices[0]?.message as any)?.reasoning_content ??
+          "";
+
+        let text = rawText;
+        if (thinkingText && thinking?.enabled) {
+          text = `<think>\n${thinkingText}\n</think>\n\n${rawText}`;
+        } else if (!text && thinkingText) {
+          text = `<think>\n${thinkingText}\n</think>`;
+        }
+
         const inp = response.usage?.prompt_tokens ?? 0;
         const out = response.usage?.completion_tokens ?? 0;
         const cached = extractCached(response.usage);
@@ -246,6 +268,7 @@ export class OpenRouterProvider implements AIProvider, BatchProvider {
 
         return {
           text,
+          thinking: thinkingText || undefined,
           usage: {
             inputTokens: inp,
             outputTokens: out,
@@ -302,30 +325,65 @@ export class OpenRouterProvider implements AIProvider, BatchProvider {
     for (let i = 0; i < chain.length; i++) {
       const m = chain[i];
       try {
-        const streamResponse = await this.client.chat.completions.create(
-          {
-            model: m,
-            messages: msgs,
-            max_tokens: maxTokens,
-            temperature,
-            stream: true,
-            stream_options: { include_usage: true },
-            ...thinkingBody,
-          },
+        const isReasoning =
+          m.includes("deepseek") ||
+          m.includes("r1") ||
+          m.includes("qwq") ||
+          isReasoningModel(m);
+
+        const requestBody: any = {
+          model: m,
+          messages: msgs,
+          max_tokens: maxTokens,
+          stream: true,
+          stream_options: { include_usage: true },
+          ...thinkingBody,
+        };
+
+        if (isReasoning) {
+          requestBody.include_reasoning = true;
+        } else {
+          requestBody.temperature = temperature;
+        }
+
+        const streamResponse: any = await this.client.chat.completions.create(
+          requestBody,
           { signal },
         );
 
         let fullText = "";
+        let thinkingText = "";
         let inp = 0;
         let out = 0;
         let cached = 0;
+        let startedThinking = false;
 
         for await (const chunk of streamResponse) {
           const delta = chunk.choices[0]?.delta?.content;
+          const reasoningDelta =
+            (chunk.choices[0]?.delta as any)?.reasoning ??
+            (chunk.choices[0]?.delta as any)?.reasoning_content;
+
+          if (reasoningDelta) {
+            thinkingText += reasoningDelta;
+            if (thinking?.enabled) {
+              if (!startedThinking) {
+                startedThinking = true;
+                onChunk("<think>\n");
+              }
+              onChunk(reasoningDelta);
+            }
+          }
+
           if (delta) {
+            if (startedThinking) {
+              startedThinking = false;
+              onChunk("\n</think>\n\n");
+            }
             fullText += delta;
             onChunk(delta);
           }
+
           if (chunk.usage) {
             inp = chunk.usage.prompt_tokens ?? 0;
             out = chunk.usage.completion_tokens ?? 0;
@@ -333,9 +391,21 @@ export class OpenRouterProvider implements AIProvider, BatchProvider {
           }
         }
 
+        if (startedThinking) {
+          onChunk("\n</think>\n");
+        }
+
+        let text = fullText;
+        if (thinkingText && thinking?.enabled) {
+          text = `<think>\n${thinkingText}\n</think>\n\n${fullText}`;
+        } else if (!text && thinkingText) {
+          text = `<think>\n${thinkingText}\n</think>`;
+        }
+
         if (i > 0) console.warn(`[openrouter] streamed with fallback "${m}"`);
         return {
-          text: fullText,
+          text,
+          thinking: thinkingText || undefined,
           usage: {
             inputTokens: inp,
             outputTokens: out,

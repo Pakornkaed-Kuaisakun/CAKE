@@ -95,7 +95,15 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
     <Box
       flexDirection='column'
       borderStyle='single'
-      borderColor={loading ? theme.muted : theme.border}
+      borderColor={
+        loading
+          ? process.env.CAKE_DEBUG === "true"
+            ? "red"
+            : theme.muted
+          : process.env.CAKE_DEBUG === "true"
+            ? "red"
+            : theme.border
+      }
       paddingX={1}
     >
       <CommandPopup suggestions={suggestions} selectedIndex={selectedIndex} />
@@ -104,7 +112,11 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
           value={value}
           onChange={onChange}
           onSubmit={onSubmit}
-          placeholder={loading ? "Waiting..." : `Ask ${APP_NAME} anything...`}
+          placeholder={
+            loading
+              ? `Waiting... ${process.env.CAKE_DEBUG === "true" ? "[DEBUG_MODE]" : ""}`
+              : `Ask ${APP_NAME} anything... ${process.env.CAKE_DEBUG === "true" ? "[DEBUG_MODE]" : ""}`
+          }
         />
       </Box>
     </Box>

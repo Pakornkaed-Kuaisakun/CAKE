@@ -240,6 +240,80 @@ export class CakeAgent {
     return this.runChat(trimmed, opts);
   }
 
+  private isComplexTask(input: string): boolean {
+    if (process.env.CAKE_DEBUG === "true") return true;
+
+    const trimmed = input.trim();
+    if (trimmed.length < 25) return false;
+
+    const lower = trimmed.toLowerCase();
+
+    // Direct simple conversational phrases or greetings
+    const simpleConversations = [
+      "hello",
+      "hi",
+      "hey",
+      "how are you",
+      "what is your name",
+      "who are you",
+      "thank you",
+      "thanks",
+      "bye",
+      "good morning",
+      "good afternoon",
+      "good evening",
+      "สวัสดี",
+      "ขอบคุณ",
+      "หวัดดี",
+      "สบายดีไหม",
+    ];
+
+    if (simpleConversations.some((c) => lower.startsWith(c) || lower === c)) {
+      return false;
+    }
+
+    // Key terms that imply programming, math, logic, analysis, or detailed explanation
+    const complexKeywords = [
+      "code",
+      "program",
+      "script",
+      "implement",
+      "function",
+      "class",
+      "algorithm",
+      "solve",
+      "calculate",
+      "math",
+      "logic",
+      "proof",
+      "debug",
+      "error",
+      "fix",
+      "why",
+      "how to",
+      "explain",
+      "compare",
+      "analyze",
+      "evaluate",
+      "design",
+      "architecture",
+      "วิเคราะห์",
+      "อธิบาย",
+      "แก้ปัญหา",
+      "เขียนโค้ด",
+      "โปรแกรม",
+      "สูตร",
+      "สมการ",
+    ];
+
+    if (complexKeywords.some((keyword) => lower.includes(keyword))) {
+      return true;
+    }
+
+    // Default to true for long queries as they generally request comprehensive details
+    return trimmed.length > 80;
+  }
+
   // ─── Unified chat runner ────────────────────────────────────────────────────
   private async runChat(
     input: string,
@@ -260,10 +334,17 @@ export class CakeAgent {
 
     this.history.push("user", input);
 
+    const shouldThink = this.isComplexTask(input);
+
     const chatOpts = {
       systemPrompt: SYSTEM_PROMPT + contextString,
       model: this.model,
       signal: opts.signal,
+      maxTokens: shouldThink ? 4096 : 1024,
+      thinking: {
+        enabled: shouldThink,
+        budgetTokens: shouldThink ? 2048 : 0,
+      },
     };
 
     const result =
