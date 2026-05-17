@@ -77,6 +77,7 @@ function makeId() {
 export interface SessionStats {
   totalInputTokens: number;
   totalOutputTokens: number;
+  totalCachedTokens: number;
   totalCostUsd: number;
 }
 
@@ -140,6 +141,7 @@ export function useAgent() {
   const [stats, setStats] = useState<SessionStats>({
     totalInputTokens: 0,
     totalOutputTokens: 0,
+    totalCachedTokens: 0,
     totalCostUsd: 0,
   });
   const [lastEvents, setLastEvents] = useState<any[]>([]);
@@ -162,11 +164,14 @@ export function useAgent() {
     setStats((prev) => ({
       totalInputTokens: prev.totalInputTokens + usage.inputTokens,
       totalOutputTokens: prev.totalOutputTokens + usage.outputTokens,
+      totalCachedTokens: prev.totalCachedTokens + (usage.cachedTokens ?? 0),
       totalCostUsd: prev.totalCostUsd + (usage.costUsd ?? 0),
     }));
     addCost({
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
+      cachedTokens: usage.cachedTokens,
+      cacheWriteTokens: usage.cacheWriteTokens,
       costUsd: usage.costUsd,
     });
   }, []);
@@ -226,12 +231,22 @@ export function useAgent() {
             return;
           }
           const historical = loadCosts();
+          const cacheHitPct =
+            historical.totalInputTokens > 0
+              ? (
+                  (historical.totalCachedTokens / historical.totalInputTokens) *
+                  100
+                ).toFixed(1)
+              : "0.0";
+
           addMsg(
             "system",
             [
               `💰 Historical Token Usage & Costs (${APP_NAME})`,
               `----------------------------------------`,
               `Total Input Tokens  : ${historical.totalInputTokens.toLocaleString()}`,
+              `  ↳ Cache Reads     : ${historical.totalCachedTokens.toLocaleString()} (${cacheHitPct}% hit rate)`,
+              `  ↳ Cache Writes    : ${historical.totalCacheWriteTokens.toLocaleString()}`,
               `Total Output Tokens : ${historical.totalOutputTokens.toLocaleString()}`,
               `Total Cost (USD)    : $${historical.totalCostUsd.toFixed(4)}`,
               `Last Updated        : ${new Date(historical.lastUpdated).toLocaleString()}`,

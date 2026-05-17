@@ -106,10 +106,18 @@ export function App() {
           <Text color='gray'>
             Tokens: {stats.totalInputTokens}↑ {stats.totalOutputTokens}↓
           </Text>
-          {stats.totalCostUsd > 0 && (
-            <Text color='gray'>
-              Session cost: {formatCost(stats.totalCostUsd)}
+          {stats.totalCachedTokens > 0 && (
+            <Text color='green'>
+              ⚡ cached: {stats.totalCachedTokens.toLocaleString()} (
+              {(
+                (stats.totalCachedTokens / stats.totalInputTokens) *
+                100
+              ).toFixed(0)}
+              %)
             </Text>
+          )}
+          {stats.totalCostUsd > 0 && (
+            <Text color='gray'>cost: {formatCost(stats.totalCostUsd)}</Text>
           )}
         </Box>
       )}

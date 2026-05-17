@@ -1,3 +1,5 @@
+// src/providers/types.ts
+
 export type ProviderName =
   | "claude"
   | "openai"
@@ -21,6 +23,10 @@ export interface ChatOptions {
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
+  /** Tokens served from the provider's prompt cache (subset of inputTokens) */
+  cachedTokens?: number;
+  /** Tokens written INTO the cache this request (Claude-specific) */
+  cacheWriteTokens?: number;
   costUsd: number | null;
 }
 

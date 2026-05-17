@@ -1,12 +1,15 @@
 // src/providers/openrouter.ts
 //
 // OpenRouter provider — OpenAI-compatible API with 429 retry + fallback.
-// Free models: https://openrouter.ai/models?q=:free
 //
-// .env keys:
-//   OPENROUTER_API_KEY=sk-or-...
-//   OPENROUTER_MODEL=google/gemma-3-27b-it:free        (main model)
-//   OPENROUTER_FAST_MODEL=google/gemma-3-12b-it:free   (intent routing)
+// Prompt caching via OpenRouter:
+//   • DeepSeek V3/R1 : automatic (same mechanism as OpenAI), shows in
+//                      cached_tokens inside prompt_tokens_details
+//   • Claude models  : pass cache_control in messages (OpenRouter forwards it)
+//   • Other models   : no caching, cachedTokens = 0
+//
+// We read cached_tokens from the response and expose it in TokenUsage.
+// Cost for OpenRouter is always 0 (pay-per-use billed by OpenRouter, not us).
 
 import OpenAI from "openai";
 import type {
@@ -17,8 +20,6 @@ import type {
   StreamChunkCallback,
 } from "./types.js";
 
-// ── Free-tier fallback chain ─────────────────────────────────────────────────
-// Tried in order when a model returns 429. Edit to taste.
 const FREE_FALLBACKS = [
   "openai/gpt-oss-20b:free",
   "deepseek/deepseek-v4-flash:free",
@@ -40,6 +41,15 @@ function is429(err: unknown): boolean {
   return false;
 }
 
+/** Extract cached token count from OpenRouter response (mirrors OpenAI shape) */
+function extractCached(usage: any): number {
+  return (
+    usage?.prompt_tokens_details?.cached_tokens ??
+    usage?.cache_read_input_tokens ?? // Claude-style via OpenRouter
+    0
+  );
+}
+
 export class OpenRouterProvider implements AIProvider {
   name = "openrouter" as const;
   private client: OpenAI;
@@ -59,7 +69,6 @@ export class OpenRouterProvider implements AIProvider {
     });
   }
 
-  // ── Build OpenAI message array ────────────────────────────────────────────
   private buildMessages(
     messages: Message[],
     systemPrompt?: string,
@@ -75,12 +84,10 @@ export class OpenRouterProvider implements AIProvider {
     return out;
   }
 
-  // ── Build fallback chain (requested model first, then free chain) ─────────
   private buildChain(model: string): string[] {
     return [model, ...FREE_FALLBACKS.filter((m) => m !== model)];
   }
 
-  // ── Chat with retry + model fallback on 429 ───────────────────────────────
   async chat(
     messages: Message[],
     options: ChatOptions = {},
@@ -107,18 +114,26 @@ export class OpenRouterProvider implements AIProvider {
         const text = response.choices[0]?.message?.content ?? "";
         const inp = response.usage?.prompt_tokens ?? 0;
         const out = response.usage?.completion_tokens ?? 0;
+        const cached = extractCached(response.usage);
+
         if (i > 0)
           console.warn(
             `[openrouter] fell back to "${m}" after 429 on "${chain[0]}"`,
           );
+
         return {
           text,
-          usage: { inputTokens: inp, outputTokens: out, costUsd: 0 },
+          usage: {
+            inputTokens: inp,
+            outputTokens: out,
+            cachedTokens: cached,
+            costUsd: 0,
+          },
         };
       } catch (err) {
         lastErr = err;
-        if (!is429(err)) throw err; // non-429: bail immediately
-        const wait = 1500 * (i + 1); // 1.5 s, 3 s, 4.5 s …
+        if (!is429(err)) throw err;
+        const wait = 1500 * (i + 1);
         console.warn(
           `[openrouter] 429 on "${m}" — trying next model in ${wait}ms`,
         );
@@ -128,12 +143,10 @@ export class OpenRouterProvider implements AIProvider {
 
     throw new Error(
       `[openrouter] All models rate-limited (429).\n` +
-        `Tip: wait a few seconds and retry, or add a paid OPENROUTER_API_KEY.\n` +
         `Last error: ${lastErr instanceof Error ? lastErr.message : String(lastErr)}`,
     );
   }
 
-  // ── Streaming with retry + model fallback on 429 ─────────────────────────
   async stream(
     messages: Message[],
     options: ChatOptions,
@@ -161,6 +174,7 @@ export class OpenRouterProvider implements AIProvider {
             max_tokens: maxTokens,
             temperature,
             stream: true,
+            stream_options: { include_usage: true },
           },
           { signal },
         );
@@ -168,6 +182,7 @@ export class OpenRouterProvider implements AIProvider {
         let fullText = "";
         let inp = 0;
         let out = 0;
+        let cached = 0;
 
         for await (const chunk of streamResponse) {
           const delta = chunk.choices[0]?.delta?.content;
@@ -178,13 +193,19 @@ export class OpenRouterProvider implements AIProvider {
           if (chunk.usage) {
             inp = chunk.usage.prompt_tokens ?? 0;
             out = chunk.usage.completion_tokens ?? 0;
+            cached = extractCached(chunk.usage);
           }
         }
 
         if (i > 0) console.warn(`[openrouter] streamed with fallback "${m}"`);
         return {
           text: fullText,
-          usage: { inputTokens: inp, outputTokens: out, costUsd: 0 },
+          usage: {
+            inputTokens: inp,
+            outputTokens: out,
+            cachedTokens: cached,
+            costUsd: 0,
+          },
         };
       } catch (err) {
         lastErr = err;
