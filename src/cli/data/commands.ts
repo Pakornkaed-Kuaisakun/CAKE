@@ -1,7 +1,7 @@
 export interface CommandSuggestion {
   command: string;
   description: string;
-  parameters?: string[];
+  parameters?: (string | string[])[];
 }
 
 export const COMMANDS: CommandSuggestion[] = [
@@ -260,5 +260,17 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/voice on", description: "Enable voice mode (F2 push-to-talk)" },
   { command: "/voice off", description: "Disable voice mode" },
   { command: "/voice status", description: "Show STT/TTS backend info" },
-  { command: "/mode debug", description: "Toggle debug mode to show all raw AI outputs" },
+  {
+    command: "/mode debug",
+    description: "Toggle debug mode to show all raw AI outputs",
+  },
+  { command: "/permissions", description: "Show permission settings" },
+  {
+    command: "/permissions <category> <level>",
+    description: "Set permission level for a category",
+    parameters: [
+      ["bash", "file_write", "file_delete", "file_edit", "export"],
+      ["deny", "ask", "allow"],
+    ],
+  },
 ];

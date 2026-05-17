@@ -35,21 +35,49 @@ export function useAutocomplete(input: string) {
     );
 
     if (exactCmd && words.length > 1) {
-      const paramInput = words.slice(1).join(" ").toLowerCase();
-      const params = exactCmd.parameters || [];
+      const rawParams = exactCmd.parameters || [];
+      
+      let params: string[] = [];
+      let is2D = Array.isArray(rawParams[0]);
+      
+      if (is2D) {
+        const paramIndex = words.length - 2;
+        const rawItem = rawParams[paramIndex];
+        params = Array.isArray(rawItem) ? rawItem : [];
+        
+        const paramInput = words[words.length - 1].toLowerCase();
+        const filteredParams = params.filter((p) =>
+          p.toLowerCase().includes(paramInput),
+        );
 
-      const filteredParams = params.filter((p) =>
-        p.toLowerCase().includes(paramInput),
-      );
+        if (filteredParams.length > 0) {
+          return filteredParams.map((p) => {
+            const completedPrefix = words.slice(0, words.length - 1).join(" ");
+            return {
+              command: p,
+              description: `Parameter for ${exactCmd.command}`,
+              fullCommand: prefix
+                ? `${prefix} | ${completedPrefix} ${p} `
+                : `${completedPrefix} ${p} `,
+            };
+          });
+        }
+      } else {
+        const paramInput = words.slice(1).join(" ").toLowerCase();
+        params = rawParams.filter((p): p is string => typeof p === "string");
+        const filteredParams = params.filter((p) =>
+          p.toLowerCase().includes(paramInput),
+        );
 
-      if (filteredParams.length > 0) {
-        return filteredParams.map((p) => ({
-          command: p,
-          description: `Parameter for ${exactCmd.command}`,
-          fullCommand: prefix
-            ? `${prefix} | ${words[0]} ${p} `
-            : `${words[0]} ${p} `,
-        }));
+        if (filteredParams.length > 0) {
+          return filteredParams.map((p) => ({
+            command: p,
+            description: `Parameter for ${exactCmd.command}`,
+            fullCommand: prefix
+              ? `${prefix} | ${words[0]} ${p} `
+              : `${words[0]} ${p} `,
+          }));
+        }
       }
     }
 

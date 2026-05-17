@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useApp } from "ink";
 import { createProvider } from "../../providers/index.js";
 import type { ProviderName, TokenUsage } from "../../providers/types.js";
@@ -31,6 +31,8 @@ import {
 } from "../../config/costs.js";
 import { consumeEmbedWarning } from "../../modules/memory/index.js";
 import { handleSessionCommand } from "../../agent/handlers/session.js";
+import { usePermission } from "./usePermission.js";
+import { handlePermissionsCommand } from "../../agent/handlers/permissions.js";
 
 const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
@@ -126,6 +128,14 @@ export function useAgent() {
     [],
   );
 
+  const { wirePermissions, interceptPermission } = usePermission(addMsg);
+
+  // Wire permission ask handlers once on mount (stable because makeAskHandler
+  // is memoised inside usePermission)
+  useEffect(() => {
+    wirePermissions();
+  }, [wirePermissions]);
+
   const buildAgent = useCallback(
     (provName: ProviderName, mod?: string) => {
       return new CakeAgent(createProvider(provName), mod, (msg) => {
@@ -193,6 +203,7 @@ export function useAgent() {
       const trimmed = value.trim();
       if (!trimmed) return;
       setInput("");
+      if (interceptPermission(trimmed)) return;
       const lower = trimmed.toLowerCase();
       const t0 = Date.now();
 
@@ -259,6 +270,15 @@ export function useAgent() {
         }
 
         switch (cmd) {
+          case "permissions": {
+            const result = await handlePermissionsCommand(
+              createProvider(providerName),
+              args,
+            );
+            addMsg("system", result.text);
+            return;
+          }
+
           case "exit":
           case "quit":
             exit();

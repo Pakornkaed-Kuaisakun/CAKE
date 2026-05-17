@@ -1,3 +1,4 @@
+// src/agent/handlers/file.ts
 import path from "path";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import {
@@ -10,7 +11,45 @@ import {
 } from "../../modules/files/index.js";
 import { text } from "../utils/text.js";
 import { formatSize } from "../utils/format.js";
+import {
+  guardOperation,
+  type PermissionRequest,
+  type PermissionDecision,
+} from "../permissions/index.js";
 
+// ── Shared ask handler (set by CLI, same pattern as bash) ─────────────────────
+
+let _askHandler:
+  | ((req: PermissionRequest) => Promise<PermissionDecision>)
+  | null = null;
+
+export function setFileAskHandler(
+  fn: (req: PermissionRequest) => Promise<PermissionDecision>,
+): void {
+  _askHandler = fn;
+}
+
+async function defaultAskHandler(
+  req: PermissionRequest,
+): Promise<PermissionDecision> {
+  if (!process.stdin.isTTY) return "deny";
+  const { createInterface } = await import("readline");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(
+      `\n⚠️  Permission required\n` +
+        `   Operation : ${req.description}\n` +
+        `   Detail    : ${req.detail}\n` +
+        `   Allow? [y/N] `,
+      (answer) => {
+        rl.close();
+        resolve(answer.trim().toLowerCase() === "y" ? "allow" : "deny");
+      },
+    );
+  });
+}
+
+// ── Read-only handlers (no permission needed) ─────────────────────────────────
 
 export async function handleFileList(
   _provider: AIProvider,
@@ -64,26 +103,6 @@ export async function handleFileSummarize(
   return text(`[FILES] Summary of ${filePath}\n\n${summary}`);
 }
 
-export async function handleFileCompose(
-  provider: AIProvider,
-  input: string,
-  model?: string,
-): Promise<ChatResult> {
-  const match = input.match(
-    /(?:compose|create|write)\s+file\s+(.+?)\s+(?:with|about|containing)\s+(.+)/i,
-  );
-  if (!match) return text("Usage: compose file <path> with <description>");
-  const content = await composeFile(
-    provider,
-    match[1].trim(),
-    match[2].trim(),
-    model,
-  );
-  return text(
-    `[FILES] Created ${match[1]}\n${"─".repeat(40)}\n${content.slice(0, 1000)}`,
-  );
-}
-
 export async function handleFindFile(
   _provider: AIProvider,
   input: string,
@@ -114,4 +133,40 @@ export async function handleFindFile(
   const count = results.length;
   const unit = count === 1 ? "FILE" : "FILES";
   return text(`[FOUND ${count} ${unit}]\n\n${list}`);
+}
+
+// ── Write handlers (permission required) ──────────────────────────────────────
+
+export async function handleFileCompose(
+  provider: AIProvider,
+  input: string,
+  model?: string,
+): Promise<ChatResult> {
+  const match = input.match(
+    /(?:compose|create|write)\s+file\s+(.+?)\s+(?:with|about|containing)\s+(.+)/i,
+  );
+  if (!match) return text("Usage: compose file <path> with <description>");
+
+  const filePath = match[1].trim();
+  const description = match[2].trim();
+
+  // ── Permission check ──────────────────────────────────────────────────────
+  const ask = _askHandler ?? defaultAskHandler;
+  const guard = await guardOperation(
+    {
+      category: "file_write",
+      description: "Create a new file",
+      detail: path.resolve(filePath),
+    },
+    ask,
+  );
+
+  if (!guard.allowed) {
+    return text(`🚫 ${guard.reason ?? "Permission denied."}`);
+  }
+
+  const content = await composeFile(provider, filePath, description, model);
+  return text(
+    `[FILES] Created ${filePath}\n${"─".repeat(40)}\n${content.slice(0, 1000)}`,
+  );
 }

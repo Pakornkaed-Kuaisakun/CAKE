@@ -1,6 +1,13 @@
+// src/agent/handlers/export.ts
 import fs from "fs";
 import path from "path";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
+import {
+  guardOperation,
+  getPermissionLevel,
+  type PermissionRequest,
+  type PermissionDecision,
+} from "../permissions/index.js";
 
 type ExportFormat = "txt" | "md" | "json" | "csv" | "html";
 
@@ -15,14 +22,10 @@ const FORMAT_ALIASES: Record<string, ExportFormat> = {
   htm: "html",
 };
 
-/**
- * Resolve the output path from the args string.
- */
 const DEFAULT_EXPORT_DIR = "reports";
 
 function resolveOutput(format: ExportFormat, argsAfterFormat: string): string {
   const raw = argsAfterFormat.trim().replace(/^["']|["']$/g, "");
-
   let target: string;
   if (!raw) {
     target = `output-${Date.now()}.${format}`;
@@ -30,24 +33,17 @@ function resolveOutput(format: ExportFormat, argsAfterFormat: string): string {
     const ext = path.extname(raw);
     target = ext ? raw : `${raw}.${format}`;
   }
-
-  // If the path is relative, prepend the default export directory.
   if (!path.isAbsolute(target)) {
     return path.resolve(DEFAULT_EXPORT_DIR, target);
   }
-
   return path.resolve(target);
 }
 
-/**
- * Convert plain text to the desired export format.
- */
 function convertContent(content: string, format: ExportFormat): string {
   switch (format) {
     case "txt":
     case "md":
       return content;
-
     case "json": {
       try {
         return JSON.stringify(JSON.parse(content), null, 2);
@@ -55,7 +51,6 @@ function convertContent(content: string, format: ExportFormat): string {
         return JSON.stringify({ output: content }, null, 2);
       }
     }
-
     case "csv": {
       const lines = content.split("\n").filter((l) => l.trim());
       const csvRows = lines.map((line) => {
@@ -67,7 +62,6 @@ function convertContent(content: string, format: ExportFormat): string {
       });
       return csvRows.join("\n");
     }
-
     case "html": {
       const escaped = content
         .replace(/&/g, "&amp;")
@@ -89,15 +83,45 @@ function convertContent(content: string, format: ExportFormat): string {
     </body>
 </html>`;
     }
-
     default:
       return content;
   }
 }
 
-/**
- * Sink handler invoked by the pipeline executor.
- */
+// ── Shared ask handler ────────────────────────────────────────────────────────
+
+let _askHandler:
+  | ((req: PermissionRequest) => Promise<PermissionDecision>)
+  | null = null;
+
+export function setExportAskHandler(
+  fn: (req: PermissionRequest) => Promise<PermissionDecision>,
+): void {
+  _askHandler = fn;
+}
+
+async function defaultAskHandler(
+  req: PermissionRequest,
+): Promise<PermissionDecision> {
+  if (!process.stdin.isTTY) return "deny";
+  const { createInterface } = await import("readline");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(
+      `\n⚠️  Permission required\n` +
+        `   Operation : ${req.description}\n` +
+        `   Detail    : ${req.detail}\n` +
+        `   Allow? [y/N] `,
+      (answer) => {
+        rl.close();
+        resolve(answer.trim().toLowerCase() === "y" ? "allow" : "deny");
+      },
+    );
+  });
+}
+
+// ── Core write (used by pipeline executor too) ────────────────────────────────
+
 export async function exportSink(
   content: string,
   _command: string,
@@ -111,20 +135,33 @@ export async function exportSink(
   const outPath = resolveOutput(format, pathArgs);
   const converted = convertContent(content, format);
 
-  // Ensure parent directories exist
+  // ── Permission check ────────────────────────────────────────────────────────
+  // export defaults to "allow" in permissions, but respect whatever level is set
+  const ask = _askHandler ?? defaultAskHandler;
+  const guard = await guardOperation(
+    {
+      category: "export",
+      description: "Write output to file",
+      detail: outPath,
+    },
+    ask,
+  );
+
+  if (!guard.allowed) {
+    return { text: `🚫 ${guard.reason ?? "Permission denied."}` };
+  }
+
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, converted, "utf-8");
 
   const sizeKb = (Buffer.byteLength(converted, "utf-8") / 1024).toFixed(1);
-
   return {
     text: `✅ Exported to ${outPath}\n   Format: ${format.toUpperCase()} | Size: ${sizeKb} KB`,
   };
 }
 
-/**
- * Standalone handler for the router.
- */
+// ── Standalone handler ────────────────────────────────────────────────────────
+
 export async function handleExport(
   _provider: AIProvider,
   input: string,
@@ -132,7 +169,7 @@ export async function handleExport(
 ): Promise<ChatResult> {
   const withoutVerb = input.replace(/^export\s+/i, "").trim();
 
-  // 1) Pipeline marker
+  // Pipeline marker
   const pipeMarker = "__pipe__:";
   const pipeIdx = withoutVerb.indexOf(pipeMarker);
   if (pipeIdx !== -1) {
@@ -141,7 +178,7 @@ export async function handleExport(
     return exportSink(content, "export", rawArgs);
   }
 
-  // 2) Inline content
+  // Inline content
   const inlineIdx = withoutVerb.indexOf("|");
   if (inlineIdx !== -1) {
     const rawArgs = withoutVerb.slice(0, inlineIdx).trim();
