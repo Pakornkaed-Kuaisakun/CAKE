@@ -13,11 +13,25 @@ export {
   OllamaProvider,
   OpenRouterProvider,
 };
+
 export type {
   AIProvider,
   ProviderName,
   Message,
   ChatOptions,
+  ChatResult,
+  TokenUsage,
+  StreamChunkCallback,
+  // Batch types
+  BatchRequest,
+  BatchResponse,
+  BatchSubmitResult,
+  BatchPollResult,
+  BatchProvider,
+  BatchStatus,
+  // Thinking types
+  ThinkingConfig,
+  ThinkingLevel,
 } from "./types.js";
 
 export function createProvider(name: ProviderName): AIProvider {

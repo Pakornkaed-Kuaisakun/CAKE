@@ -18,6 +18,8 @@ export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  /** Enable extended thinking / chain-of-thought reasoning */
+  thinking?: import("./batch-types.js").ThinkingConfig;
 }
 
 export interface TokenUsage {
@@ -27,11 +29,15 @@ export interface TokenUsage {
   cachedTokens?: number;
   /** Tokens written INTO the cache this request (Claude-specific) */
   cacheWriteTokens?: number;
+  /** Thinking/reasoning tokens used (Claude extended thinking, OpenAI reasoning) */
+  thinkingTokens?: number;
   costUsd: number | null;
 }
 
 export interface ChatResult {
   text: string;
+  /** Extracted chain-of-thought reasoning (if thinking was enabled) */
+  thinking?: string;
   usage?: TokenUsage;
 }
 
@@ -50,3 +56,15 @@ export interface AIProvider {
   embed?(text: string, model?: string): Promise<number[]>;
   listModels?(): Promise<string[]>;
 }
+
+// Re-export batch types for convenience
+export type {
+  BatchRequest,
+  BatchResponse,
+  BatchSubmitResult,
+  BatchPollResult,
+  BatchProvider,
+  BatchStatus,
+  ThinkingConfig,
+  ThinkingLevel,
+} from "./batch-types.js";
