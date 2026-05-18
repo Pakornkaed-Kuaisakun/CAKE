@@ -195,6 +195,53 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "vision <question> <BETA>",
     description: "Take a screenshot and answer a question about it",
   },
+  // ── Vector Database ─────────────────────────────────────────────────────────
+  {
+    command: "vdb_query <question>",
+    description:
+      "Search ALL collections in local vector DB and get an AI answer",
+  },
+  {
+    command: "vdb_query <collection> <question>",
+    description: "Search a specific collection and get an AI answer",
+  },
+  {
+    command: "vdb_add <collection> <text>",
+    description: "Add a text snippet to a local vector DB collection",
+  },
+  {
+    command: "vdb_ingest <collection> <file_path>",
+    description:
+      "Ingest a PDF/DOCX/TXT file into a vector DB collection (chunked)",
+  },
+  {
+    command: "vdb_create <collection> [description]",
+    description: "Create a new empty vector DB collection",
+  },
+  {
+    command: "vdb_list",
+    description: "List all local vector DB collections",
+  },
+  {
+    command: "vdb_list <collection>",
+    description: "List documents inside a specific collection",
+  },
+  {
+    command: "vdb_delete <collection> <doc_id>",
+    description: "Delete a specific document from a collection",
+  },
+  {
+    command: "vdb_drop <collection>",
+    description: "Delete an entire vector DB collection and all its data",
+  },
+  {
+    command: "vdb_clear <collection>",
+    description: "Remove all documents from a collection (keep collection)",
+  },
+  {
+    command: "vdb_info <collection>",
+    description: "Show collection statistics and sample documents",
+  },
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },

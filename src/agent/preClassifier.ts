@@ -80,6 +80,32 @@ const TOOL_PREFIXES = new Set([
   "scan", // "scan <dir>" always routes to handleSecurityScan
   "email", // "email" on its own = read inbox
   "performance",
+  // Vector database commands
+  "vdb",
+  "vdb_query",
+  "vdb_search",
+  "vdb_ask",
+  "vdb_add",
+  "vdb_insert",
+  "vdb_store",
+  "vdb_ingest",
+  "vdb_import",
+  "vdb_index",
+  "vdb_load",
+  "vdb_create",
+  "vdb_list",
+  "vdb_ls",
+  "vdb_show",
+  "vdb_delete",
+  "vdb_remove",
+  "vdb_del",
+  "vdb_drop",
+  "vdb_destroy",
+  "vdb_clear",
+  "vdb_empty",
+  "vdb_flush",
+  "vdb_info",
+  "vdb_stat",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────

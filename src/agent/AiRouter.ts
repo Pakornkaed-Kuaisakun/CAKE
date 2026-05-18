@@ -54,6 +54,16 @@ const VALID_INTENTS = new Set([
   "plugins",
   "screenshot",
   "vision",
+  "vdb",
+  "vdb_query",
+  "vdb_add",
+  "vdb_ingest",
+  "vdb_create",
+  "vdb_list",
+  "vdb_delete",
+  "vdb_drop",
+  "vdb_clear",
+  "vdb_info",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -99,6 +109,16 @@ autonomous        — multi-step agent to accomplish a complex goal
 plugins           — list loaded plugins or plugin status
 screenshot        — capture and describe the screen
 vision            — alias for screenshot
+vdb               — any local vector database operation (fallback dispatcher)
+vdb_query         — search/query local vector database with a question
+vdb_add           — add/insert a text snippet into local vector database
+vdb_ingest        — ingest/import a file (PDF/DOCX/TXT) into vector database
+vdb_create        — create a new vector database collection
+vdb_list          — list vector database collections or documents
+vdb_delete        — delete a specific document from vector database
+vdb_drop          — delete an entire vector database collection
+vdb_clear         — remove all documents from a vector database collection
+vdb_info          — show vector database collection statistics
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -124,7 +144,18 @@ EXAMPLES (input → intent):
 "what's on my screen?" → screenshot
 "screenshot what app is open?" → screenshot
 "analyze my screen" → screenshot
-"clear all my todos" → todo_remove_all`;
+"clear all my todos" → todo_remove_all
+"search local database for malaria symptoms" → vdb_query
+"add to diseases database: dengue fever causes fever and rash" → vdb_add
+"ingest medical-reference.pdf into diseases collection" → vdb_ingest
+"create a collection called products" → vdb_create
+"list all vector database collections" → vdb_list
+"show documents in diseases collection" → vdb_list
+"delete document abc123 from diseases" → vdb_delete
+"drop the old-data collection" → vdb_drop
+"what does the local database say about diabetes?" → vdb_query
+
+`;
 
 export async function aiIntentRouter(
   provider: AIProvider,

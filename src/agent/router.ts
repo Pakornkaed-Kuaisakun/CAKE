@@ -284,6 +284,54 @@ export const ROUTES: Route[] = [
     ],
     handler: H.handleScreenshot,
   },
+
+  // ── Vector Database ────────────────────────────────────────────────────────
+  {
+    patterns: [/^vdb_query\b/i, /^vdb_search\b/i, /^vdb_ask\b/i],
+    handler: H.handleVdbQuery,
+  },
+  {
+    patterns: [/^vdb_add\b/i, /^vdb_insert\b/i, /^vdb_store\b/i],
+    handler: H.handleVdbAdd,
+  },
+  {
+    patterns: [
+      /^vdb_ingest\b/i,
+      /^vdb_import\b/i,
+      /^vdb_index\b/i,
+      /^vdb_load\b/i,
+    ],
+    handler: H.handleVdbIngest,
+  },
+  {
+    patterns: [/^vdb_create\b/i, /^vdb_new\b/i],
+    handler: H.handleVdbCreate,
+  },
+  {
+    patterns: [/^vdb_list\b/i, /^vdb_ls\b/i, /^vdb_show\b/i],
+    handler: H.handleVdbList,
+  },
+  {
+    patterns: [/^vdb_delete\b/i, /^vdb_remove\b/i, /^vdb_del\b/i],
+    handler: H.handleVdbDelete,
+  },
+  {
+    patterns: [/^vdb_drop\b/i, /^vdb_destroy\b/i],
+    handler: H.handleVdbDrop,
+  },
+  {
+    patterns: [/^vdb_clear\b/i, /^vdb_empty\b/i, /^vdb_flush\b/i],
+    handler: H.handleVdbClear,
+  },
+  {
+    patterns: [/^vdb_info\b/i, /^vdb_stat\b/i],
+    handler: H.handleVdbInfo,
+  },
+  {
+    // Generic vdb dispatch for natural-language forms
+    patterns: [/^vdb\s+/i],
+    handler: H.handleVdbDispatch,
+  },
 ];
 
 /**

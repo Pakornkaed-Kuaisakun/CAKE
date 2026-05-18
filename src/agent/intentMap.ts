@@ -80,6 +80,25 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
 
   screenshot: H.handleScreenshot,
   vision: H.handleScreenshot,
+
+  // ── Vector Database ────────────────────────────────────────────────────────
+  vdb_query: H.handleVdbQuery,
+  vdb_search: H.handleVdbQuery,
+  vdb_ask: H.handleVdbQuery,
+  vdb_add: H.handleVdbAdd,
+  vdb_insert: H.handleVdbAdd,
+  vdb_ingest: H.handleVdbIngest,
+  vdb_import: H.handleVdbIngest,
+  vdb_index: H.handleVdbIngest,
+  vdb_create: H.handleVdbCreate,
+  vdb_list: H.handleVdbList,
+  vdb_ls: H.handleVdbList,
+  vdb_delete: H.handleVdbDelete,
+  vdb_remove: H.handleVdbDelete,
+  vdb_drop: H.handleVdbDrop,
+  vdb_clear: H.handleVdbClear,
+  vdb_info: H.handleVdbInfo,
+  vdb: H.handleVdbDispatch,
 };
 
 /**
