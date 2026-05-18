@@ -30,7 +30,8 @@ export type OperationCategory =
   | "file_write"
   | "file_delete"
   | "file_edit"
-  | "export";
+  | "export"
+  | "finance";
 
 export interface PermissionMap {
   bash: PermissionLevel;
@@ -38,6 +39,7 @@ export interface PermissionMap {
   file_delete: PermissionLevel;
   file_edit: PermissionLevel;
   export: PermissionLevel;
+  finance: PermissionLevel;
 }
 
 export interface PermissionRequest {
@@ -58,6 +60,7 @@ const DEFAULTS: PermissionMap = {
   file_delete: "ask",
   file_edit: "ask",
   export: "allow", // export is explicit intent — allow by default
+  finance: "ask",
 };
 
 // ── Persistence ───────────────────────────────────────────────────────────────
@@ -75,6 +78,7 @@ export function loadPermissions(): PermissionMap {
       file_delete: parsed.file_delete ?? DEFAULTS.file_delete,
       file_edit: parsed.file_edit ?? DEFAULTS.file_edit,
       export: parsed.export ?? DEFAULTS.export,
+      finance: parsed.finance ?? DEFAULTS.finance,
     };
   } catch {
     return { ...DEFAULTS };
@@ -218,6 +222,7 @@ export const CATEGORY_LABELS: Record<OperationCategory, string> = {
   file_delete: "Delete files",
   file_edit: "Edit / modify files",
   export: "Export output to disk",
+  finance: "Report Stock as PDF",
 };
 
 export const LEVEL_ICONS: Record<PermissionLevel, string> = {

@@ -269,7 +269,7 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "/permissions <category> <level>",
     description: "Set permission level for a category",
     parameters: [
-      ["bash", "file_write", "file_delete", "file_edit", "export"],
+      ["bash", "file_write", "file_delete", "file_edit", "export", "finance"],
       ["deny", "ask", "allow"],
     ],
   },

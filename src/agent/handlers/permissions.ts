@@ -40,6 +40,7 @@ const DEFAULTS: Record<OperationCategory, PermissionLevel> = {
   file_delete: "ask",
   file_edit: "ask",
   export: "allow",
+  finance: "ask",
 };
 
 export async function handlePermissionsCommand(
