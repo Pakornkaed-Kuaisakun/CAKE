@@ -18,6 +18,7 @@ import { hasPipe, parsePipeline, executePipeline } from "./pipeline/index.js";
 import { clearIntentCache } from "./intentCache.js";
 import { loadAllPlugins } from "./plugins/loader.js";
 import { registerPlugins } from "./plugins/registry.js";
+import { UserAwarenessManager } from "../modules/userAwareness/index.js";
 
 export interface AgentResponse {
   text: string;
@@ -54,6 +55,7 @@ export class CakeAgent {
   private model: string | undefined;
   private fastModel: string | undefined;
   private responseCache: ResponseCache;
+  private awareness: UserAwarenessManager;
 
   constructor(
     provider: AIProvider,
@@ -65,6 +67,7 @@ export class CakeAgent {
     this.memory = new MemoryManager(provider);
     this.model = model;
     this.fastModel = getFastModel(this.provider.name);
+    this.awareness = new UserAwarenessManager(provider, model);
     this.responseCache = new ResponseCache(100, 5 * 60_000);
 
     initCronManager(async (job) => {
@@ -93,6 +96,7 @@ export class CakeAgent {
 
   setModel(model: string | undefined): void {
     this.model = model;
+    this.awareness.setProvider(this.provider, model);
     // Intent cache is model-agnostic (intents don't change per model),
     // but clear it when provider changes to avoid stale routing decisions.
   }
@@ -102,12 +106,14 @@ export class CakeAgent {
     this.model = model;
     this.fastModel = getFastModel(provider.name);
     this.memory = new MemoryManager(provider);
+    this.awareness.setProvider(provider, model);
     clearIntentCache(); // new provider may handle different intents
     this.responseCache = new ResponseCache(100, 5 * 60_000);
   }
 
   clearHistory(): void {
     this.history.clear();
+    this.awareness.clearProfile();
   }
 
   loadHistory(messages: import("../providers/types.js").Message[]): void {
@@ -336,8 +342,10 @@ export class CakeAgent {
 
     const shouldThink = this.isComplexTask(input);
 
+    const awarenessContext = this.awareness.getContextString(input);
+
     const chatOpts = {
-      systemPrompt: SYSTEM_PROMPT + contextString,
+      systemPrompt: SYSTEM_PROMPT + contextString + awarenessContext,
       model: this.model,
       signal: opts.signal,
       maxTokens: shouldThink ? 4096 : 1024,
@@ -357,6 +365,7 @@ export class CakeAgent {
         : await this.provider.chat(this.history.getAll(), chatOpts);
 
     this.history.push("assistant", result.text);
+    this.awareness.observe(input, result.text);
     this.rememberAsync(`User: ${input}\nAssistant: ${result.text}`, {
       source: "conversation",
     });
