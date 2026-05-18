@@ -6,6 +6,15 @@ import {
 } from "../../modules/calendar/index.js";
 import { exactEvent } from "../calendarHelper/exactEvent.js";
 import { text } from "../utils/text.js";
+import fs from "fs";
+import path from "path";
+import { CAKE_DIR } from "../../config/constants.js";
+
+const CALENDAR_CACHE_DIR = path.join(CAKE_DIR, "cache");
+const CALENDAR_CACHE_FILE = path.join(
+  CALENDAR_CACHE_DIR,
+  "calendar-events.json",
+);
 
 export async function handleCalendarList(
   _provider: AIProvider,
@@ -13,13 +22,28 @@ export async function handleCalendarList(
   _model?: string,
 ): Promise<ChatResult> {
   const events = await listUpcoming(10);
+
+  // ── Write cache for autocomplete ──────────────────────────────────────────
+  try {
+    fs.mkdirSync(CALENDAR_CACHE_DIR, { recursive: true });
+    fs.writeFileSync(
+      CALENDAR_CACHE_FILE,
+      JSON.stringify(events, null, 2),
+      "utf-8",
+    );
+  } catch {
+    // non-fatal — autocomplete just won't show IDs if write fails
+  }
+
   if (events.length === 0) return text("No upcoming events found.");
+
   const out = events
     .map(
       (e) =>
         `  • ${e.summary} [${e.id}]\n    Start: ${new Date(e.start).toLocaleString()}\n    End: ${new Date(e.end).toLocaleString()}\n`,
     )
     .join("\n");
+
   return text(`[CALENDAR] Upcoming events:\n${out}`);
 }
 
