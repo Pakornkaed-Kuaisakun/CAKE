@@ -242,6 +242,35 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "vdb_info <collection>",
     description: "Show collection statistics and sample documents",
   },
+  // ── Locker ─────────────────────────────────────────────────────────────────
+  {
+    command: "locker_add <label> [--category <cat>]",
+    description: "Store an encrypted secret (API key, password, token)",
+  },
+  {
+    command: "locker_list",
+    description: "List all stored secrets (labels only, no values)",
+  },
+  {
+    command: "locker_get <id or label>",
+    description: "Reveal a secret — requires password",
+  },
+  {
+    command: "locker_delete <id or label>",
+    description: "Delete a stored secret",
+  },
+  {
+    command: "locker_update <id or label>",
+    description: "Update a secret's value — requires password",
+  },
+  {
+    command: "locker_clear --confirm",
+    description: "⚠️  Wipe ALL stored secrets permanently",
+  },
+  {
+    command: "locker_info",
+    description: "Show locker storage info and encryption details",
+  },
 
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },

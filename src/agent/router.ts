@@ -332,6 +332,29 @@ export const ROUTES: Route[] = [
     patterns: [/^vdb\s+/i],
     handler: H.handleVdbDispatch,
   },
+  // ── Locker ─────────────────────────────────────────────────────────────────
+  {
+    patterns: [/^locker_add\b/i, /^locker add\b/i],
+    handler: H.handleLockerAdd,
+  },
+  {
+    patterns: [/^locker_get\b/i, /^locker show\b/i, /^locker_show\b/i],
+    handler: H.handleLockerGet,
+  },
+  {
+    patterns: [/^locker_list\b/i, /^locker list\b/i, /^locker\s*$/i],
+    handler: H.handleLockerList,
+  },
+  {
+    patterns: [/^locker_delete\b/i, /^locker delete\b/i, /^locker_remove\b/i],
+    handler: H.handleLockerDelete,
+  },
+  {
+    patterns: [/^locker_update\b/i, /^locker update\b/i],
+    handler: H.handleLockerUpdate,
+  },
+  { patterns: [/^locker_clear\b/i], handler: H.handleLockerClear },
+  { patterns: [/^locker_info\b/i], handler: H.handleLockerInfo },
 ];
 
 /**

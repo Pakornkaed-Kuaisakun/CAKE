@@ -106,6 +106,17 @@ const TOOL_PREFIXES = new Set([
   "vdb_flush",
   "vdb_info",
   "vdb_stat",
+  // ── Locker ─────────────────────────────────────────────────────────────────
+  "locker",
+  "locker_add",
+  "locker_get",
+  "locker_show",
+  "locker_list",
+  "locker_delete",
+  "locker_remove",
+  "locker_update",
+  "locker_clear",
+  "locker_info",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────

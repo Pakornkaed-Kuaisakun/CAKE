@@ -21,10 +21,23 @@ interface Props {
   onSubmit: (v: string) => void;
 
   loading: boolean;
+
+  masked?: boolean;
+  onCancelLocker?: () => void;
+  lockerActive?: boolean;
 }
 
-export function InputBar({ value, onChange, onSubmit, loading }: Props) {
-  const suggestions = useAutocomplete(value);
+export function InputBar({
+  value,
+  onChange,
+  onSubmit,
+  loading,
+  masked,
+  onCancelLocker,
+  lockerActive,
+}: Props) {
+  const rawSuggestions = useAutocomplete(value);
+  const suggestions = masked ? [] : rawSuggestions;
   const { theme } = useTheme();
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -42,6 +55,12 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
    */
 
   useInput((input, key) => {
+    if (lockerActive && key.escape && onCancelLocker) {
+      onCancelLocker();
+      onChange("");
+      return;
+    }
+
     if (loading || suggestions.length === 0) {
       return;
     }
@@ -117,6 +136,7 @@ export function InputBar({ value, onChange, onSubmit, loading }: Props) {
               ? `Waiting... ${process.env.CAKE_DEBUG === "true" ? "[DEBUG_MODE]" : ""}`
               : `Ask ${APP_NAME} anything... ${process.env.CAKE_DEBUG === "true" ? "[DEBUG_MODE]" : ""}`
           }
+          masked={masked}
         />
       </Box>
     </Box>

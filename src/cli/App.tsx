@@ -8,6 +8,7 @@ import { InputBar } from "./components/InputBar.js";
 import { useAgent } from "./hooks/useAgent.js";
 import { VoiceBar } from "./components/VoiceBar.js";
 import { useVoice } from "./hooks/useVoice.js";
+import { LockerBar } from "./components/LockerBar.js";
 
 function formatMs(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -32,6 +33,8 @@ export function App() {
     handleSubmit,
     stats,
     registerVoice,
+    locker,
+    addMsg,
   } = useAgent();
 
   // BUG FIX: useVoice's speakText and makeSpeakingOnChunk signatures changed.
@@ -72,6 +75,13 @@ export function App() {
 
       <MessageList messages={messages} version={msgVersion} />
 
+      {locker.lockerState.step !== "idle" && (
+        <LockerBar
+          step={locker.lockerState.step}
+          prompt={locker.lockerState.prompt}
+        />
+      )}
+
       {voiceEnabled && (
         <VoiceBar
           isRecording={isRecording}
@@ -98,6 +108,12 @@ export function App() {
         onChange={setInput}
         onSubmit={handleSubmit}
         loading={loading}
+        masked={locker.shouldMask}
+        onCancelLocker={() => {
+          locker.cancelLockerFlow();
+          addMsg("system", "🔐 Locker flow cancelled.");
+        }}
+        lockerActive={locker.lockerState.step !== "idle"}
       />
 
       {/* ── Session token/cost footer ── */}

@@ -64,6 +64,14 @@ const VALID_INTENTS = new Set([
   "vdb_drop",
   "vdb_clear",
   "vdb_info",
+  "locker",
+  "locker_add",
+  "locker_get",
+  "locker_list",
+  "locker_delete",
+  "locker_update",
+  "locker_clear",
+  "locker_info",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -119,6 +127,13 @@ vdb_delete        — delete a specific document from vector database
 vdb_drop          — delete an entire vector database collection
 vdb_clear         — remove all documents from a vector database collection
 vdb_info          — show vector database collection statistics
+locker_add    — store/save a new secret key, password, token or credential
+locker_get    — retrieve/show/reveal a stored secret
+locker_list   — list all stored secrets (no values shown)
+locker_delete — delete/remove a stored secret
+locker_update — update/change a stored secret's value
+locker_clear  — wipe/clear all stored secrets
+locker_info   — show locker info and help
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -154,6 +169,12 @@ EXAMPLES (input → intent):
 "delete document abc123 from diseases" → vdb_delete
 "drop the old-data collection" → vdb_drop
 "what does the local database say about diabetes?" → vdb_query
+"store my GitHub token" → locker_add
+"save my API key" → locker_add
+"show my AWS secret" → locker_get
+"reveal my password" → locker_get
+"list my keys" → locker_list
+"delete my old token" → locker_delete
 
 `;
 

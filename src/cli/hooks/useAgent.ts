@@ -33,6 +33,8 @@ import { consumeEmbedWarning } from "../../modules/memory/index.js";
 import { handleSessionCommand } from "../../agent/handlers/session.js";
 import { usePermission } from "./usePermission.js";
 import { handlePermissionsCommand } from "../../agent/handlers/permissions.js";
+import { useLocker } from "./useLocker.js";
+import { NEEDS_PASSWORD, NEEDS_VALUE } from "../../agent/handlers/locker.js";
 
 const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
@@ -85,6 +87,7 @@ export interface SessionStats {
 
 export function useAgent() {
   const { exit } = useApp();
+  const locker = useLocker();
   const { theme, setTheme: setAppTheme } = useTheme();
 
   const [msgVersion, setMsgVersion] = useState(0);
@@ -204,6 +207,14 @@ export function useAgent() {
       if (!trimmed) return;
       setInput("");
       if (interceptPermission(trimmed)) return;
+      // Intercept locker multi-step flow
+      if (
+        locker.interceptLockerInput(trimmed, handleSubmit, () => {
+          addMsg("system", "🔐 Locker flow cancelled.");
+        })
+      ) {
+        return;
+      }
       const lower = trimmed.toLowerCase();
       const t0 = Date.now();
 
@@ -712,7 +723,14 @@ export function useAgent() {
       }
 
       // ── Agent call with streaming ─────────────────────────────────────────
-      addMsg("user", trimmed);
+      let chatInput = trimmed;
+      if (trimmed.includes("__value__:") || trimmed.includes("__password__:")) {
+        chatInput = trimmed
+          .split("__value__:")[0]
+          .split("__password__:")[0]
+          .trim();
+      }
+      addMsg("user", chatInput);
       setLoading(true);
       startTimer();
 
@@ -749,6 +767,14 @@ export function useAgent() {
         };
 
         const resp = await agent.run(trimmed, runOpts);
+        const lockerPrompt = locker.detectLockerSignal(resp.text, trimmed);
+        if (lockerPrompt) {
+          // Show the locker prompt instead of the raw signal text
+          addMsg("system", lockerPrompt);
+          setLoading(false);
+          stopTimer();
+          return;
+        }
         const finalTime = Date.now() - t0;
         stopTimer();
         checkEmbedWarning();
@@ -820,6 +846,8 @@ export function useAgent() {
       theme,
       checkEmbedWarning,
       messages,
+      locker,
+      interceptPermission,
     ],
   );
 
@@ -835,5 +863,7 @@ export function useAgent() {
     handleSubmit,
     stats,
     registerVoice,
+    locker,
+    addMsg,
   };
 }

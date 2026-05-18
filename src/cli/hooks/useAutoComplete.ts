@@ -13,6 +13,7 @@ import { buildVdbCommands, DOC_ID_SENTINEL } from "../data/vdbCommands.js";
 import { useVdbCollections } from "./vdb/useVdbCollections.js";
 import { useVdbDocuments } from "./vdb/useVdbDocuments.js";
 import { useItemHints, type RemoveCommand } from "./useItemHints.js";
+import { useLockerHints } from "../hints/lockerHints.js";
 
 function stripPlaceholders(cmd: string): string {
   const cleaned = cmd.replace(/(<[^>]+>|\[[^\]]+\])/g, "").trimEnd();
@@ -53,6 +54,19 @@ function detectRemoveSlot(words: string[]): RemoveCommand {
   return "";
 }
 
+const LOCKER_COMMANDS = new Set([
+  "locker_get",
+  "locker_delete",
+  "locker_update",
+]);
+
+function detectLockerSlot(words: string[]): boolean {
+  if (words.length === 2 && LOCKER_COMMANDS.has(words[0].toLowerCase())) {
+    return true;
+  }
+  return false;
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useAutocomplete(input: string) {
@@ -72,9 +86,11 @@ export function useAutocomplete(input: string) {
   const collections = useVdbCollections();
   const activeVdbCol = useMemo(() => detectVdbDeleteSlot(words), [words]);
   const activeRemoveCmd = useMemo(() => detectRemoveSlot(words), [words]);
+  const activeLocker = useMemo(() => detectLockerSlot(words), [words]);
 
   const docHints = useVdbDocuments(activeVdbCol);
   const removeHints = useItemHints(activeRemoveCmd);
+  const lockerHints = useLockerHints(activeLocker);
 
   // ── Merged command list ───────────────────────────────────────────────────
 
@@ -113,6 +129,24 @@ export function useAutocomplete(input: string) {
         fullCommand: prefix
           ? `${prefix} | ${activeRemoveCmd} ${h.id} `
           : `${activeRemoveCmd} ${h.id} `,
+      }));
+    }
+
+    // ── 1b. locker commands <id|label> ───────────────────────────────────────
+    if (activeLocker && lockerHints.length > 0) {
+      const typed = words[1]?.toLowerCase() ?? "";
+      const matched = lockerHints.filter(
+        (h) =>
+          h.id.toLowerCase().includes(typed) ||
+          h.label.toLowerCase().includes(typed),
+      );
+
+      return matched.map((h) => ({
+        command: h.id,
+        description: `Locker secret: ${h.label} ${h.category ? `[${h.category}]` : ""}`,
+        fullCommand: prefix
+          ? `${prefix} | ${words[0]} ${h.id} `
+          : `${words[0]} ${h.id} `,
       }));
     }
 
@@ -217,7 +251,9 @@ export function useAutocomplete(input: string) {
     ALL_COMMANDS,
     docHints,
     removeHints,
+    lockerHints,
     activeRemoveCmd,
+    activeLocker,
     activeVdbCol,
   ]);
 }

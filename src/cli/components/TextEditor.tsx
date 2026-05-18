@@ -15,6 +15,11 @@ interface Props {
   placeholder?: string;
 
   disabled?: boolean;
+  /**
+   * If true, input will be visually masked (●●●●)
+   * and Ctrl+U will clear the field entirely.
+   */
+  masked?: boolean;
 }
 
 export function TextEditor({
@@ -23,6 +28,7 @@ export function TextEditor({
   onSubmit,
   placeholder,
   disabled = false,
+  masked,
 }: Props) {
   const { theme } = useTheme();
   /**
@@ -435,7 +441,7 @@ export function TextEditor({
      * NORMAL INPUT
      */
 
-    if (input && !key.ctrl && !key.meta) {
+    if (input && !key.ctrl && !key.meta && !key.escape) {
       let next: string;
 
       let nextCursor: number;
@@ -476,10 +482,9 @@ export function TextEditor({
       <>
         {value.split("").map((char, index) => {
           const isCursor = index === cursor && cursorVisible;
-
           const isSelected =
             selection && index >= selection.start && index < selection.end;
-
+          const display = masked ? "•" : char; // ← mask here
           return (
             <Text
               key={index}
@@ -487,7 +492,7 @@ export function TextEditor({
               inverse={Boolean(isCursor)}
               backgroundColor={isSelected ? theme.secondary : undefined}
             >
-              {char}
+              {display}
             </Text>
           );
         })}

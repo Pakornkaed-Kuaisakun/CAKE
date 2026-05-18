@@ -99,6 +99,17 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
   vdb_clear: H.handleVdbClear,
   vdb_info: H.handleVdbInfo,
   vdb: H.handleVdbDispatch,
+  // ── Locker ─────────────────────────────────────────────────────────────────
+  locker_add: H.handleLockerAdd,
+  locker_get: H.handleLockerGet,
+  locker_show: H.handleLockerGet,
+  locker_list: H.handleLockerList,
+  locker_delete: H.handleLockerDelete,
+  locker_remove: H.handleLockerDelete,
+  locker_update: H.handleLockerUpdate,
+  locker_clear: H.handleLockerClear,
+  locker_info: H.handleLockerInfo,
+  locker: H.handleLockerInfo, // bare "locker" → info/help
 };
 
 /**
