@@ -2,6 +2,16 @@ import type { AIProvider } from "../../providers/types.js";
 import type { AutonomousResult, StepResult } from "./types.js";
 import { planNextStep } from "./planner.js";
 import { getToolRunner } from "./toolRegistry.js";
+import {
+  ExecutionState,
+  SUMMARY_INTERVAL,
+  recordStep,
+  buildProgressSummary,
+  buildPlannerMessage,
+} from "./executionState.js";
+import crypto from "crypto";
+import { CheckpointManager } from "./checkpoint.js";
+import { getFastModel, getFullModel } from "../../providers/utils.js";
 
 const DEFAULT_MAX_STEPS = 20;
 
@@ -10,6 +20,8 @@ export interface ExecutorOptions {
   /** Called after each step so the CLI can stream progress  */
   onStep?: (step: StepResult) => void;
   model?: string;
+  plannerModel?: string;  // Fast model for planning decisions
+  workerModel?: string;   // Full model for complex tool tasks
   signal?: AbortSignal;
 }
 
@@ -18,111 +30,119 @@ export async function executeAutonomous(
   goal: string,
   options: ExecutorOptions = {},
 ): Promise<AutonomousResult> {
-  const { maxSteps = DEFAULT_MAX_STEPS, onStep, model, signal } = options;
+  const { maxSteps = 20, onStep, model, plannerModel, workerModel, signal } = options;
 
-  const history: Array<{ tool: string; input: string; output: string }> = [];
+  // Dynamically resolve appropriate models based on the active provider
+  const resolvedPlannerModel = plannerModel || getFastModel(provider.name) || model;
+  const resolvedWorkerModel = workerModel || model || getFullModel(provider.name);
+
+  const goalId = crypto.createHash("sha256").update(goal).digest("hex");
+  const checkpointMgr = new CheckpointManager();
+  const existing = checkpointMgr.load(goalId);
+
+  // Initialize or restore compressed execution state
+  let state: ExecutionState;
+  let startStep = 1;
+
+  if (existing) {
+    state = existing.state;
+    startStep = existing.stepNum + 1;
+  } else {
+    state = {
+      goal,
+      completedSteps: [],
+      progressSummary: '',
+      recentSteps: [],
+      failedTools: new Set(),
+    };
+  }
+
   const steps: StepResult[] = [];
-  let finalAnswer = "";
+  
+  // Reconstruct step results if resuming
+  if (existing) {
+    for (const step of state.completedSteps) {
+      steps.push({
+        step: step.step,
+        thought: "Restored from checkpoint",
+        tool: step.tool,
+        input: step.inputPreview,
+        output: step.outputSummary,
+        success: step.success,
+      });
+    }
+  }
+
+  let finalAnswer = '';
   let success = false;
 
-  for (let stepNum = 1; stepNum <= maxSteps; stepNum++) {
-    if (signal?.aborted) {
-      finalAnswer = "Autonomous run cancelled by user.";
-      break;
+  for (let stepNum = startStep; stepNum <= maxSteps; stepNum++) {
+    if (signal?.aborted) break;
+
+    // Regenerate progress summary every N steps
+    if (stepNum > 1 && (stepNum - 1) % SUMMARY_INTERVAL === 0) {
+      state.progressSummary = buildProgressSummary(state);
     }
 
-    // 1. Plan
+    // Build planner message using compressed state — O(WINDOW_SIZE) not O(stepNum)
+    const plannerMessage = buildPlannerMessage(state, stepNum);
+
     let planned;
     try {
-      planned = await planNextStep(provider, goal, history, model);
+      planned = await planNextStep(provider, plannerMessage, resolvedPlannerModel);
     } catch (err: any) {
-      const result: StepResult = {
-        step: stepNum,
-        thought: "Planner error",
-        tool: "finish",
-        input: "",
-        output: `Planner failed: ${err.message}`,
-        success: false,
-      };
-      steps.push(result);
-      onStep?.(result);
-      finalAnswer = `Stopped due to planner error: ${err.message}`;
+      finalAnswer = `Stopped: planner error: ${err.message}`;
       break;
     }
 
     const { thought, tool, input } = planned;
 
-    // 2. Finish check
-    if (tool === "finish") {
+    if (tool === 'finish') {
       finalAnswer = input;
       success = true;
-      const result: StepResult = {
-        step: stepNum,
-        thought,
-        tool,
-        input,
-        output: input,
-        success: true,
-      };
-      steps.push(result);
-      onStep?.(result);
+      steps.push({ step: stepNum, thought, tool, input, output: input, success: true });
+      onStep?.({ step: stepNum, thought, tool, input, output: input, success: true });
+      checkpointMgr.cleanup(goalId);
       break;
     }
 
-    // 3. Run tool
     const runner = getToolRunner(tool);
-    let output: string;
+    let rawOutput: string;
     let stepSuccess = true;
 
     if (!runner) {
-      // Give the planner a targeted hint so it corrects itself next step
-      const hint =
-        tool === "write_file" || tool === "save"
-          ? `Unknown tool "${tool}". To save a file use: export md filename.md|<content>`
-          : tool === "file_save" || tool === "file_write"
-          ? `Unknown tool "${tool}". Use: export md filename.md|<content> to save files.`
-          : `Unknown tool "${tool}". Valid tools: search, bash, file_read, file_summarize, export, chat, finish, and others listed in AVAILABLE TOOLS.`;
-      output = hint;
+      rawOutput = `Unknown tool "${tool}". Use only listed tools.`;
       stepSuccess = false;
     } else {
       try {
-        output = await runner(provider, input, model);
+        rawOutput = await runner(provider, input, resolvedWorkerModel);
       } catch (err: any) {
-        output = `Tool "${tool}" threw an error: ${err.message}`;
+        rawOutput = `Tool error: ${err.message}`;
         stepSuccess = false;
       }
     }
 
-    // Trim very long outputs before feeding back to the planner
-    const trimmedOutput =
-      output.length > 2000
-        ? output.slice(0, 2000) + "\n...[TRUNCATED]"
-        : output;
+    // Compress output before storing in state
+    recordStep(state, stepNum, tool, input, rawOutput, stepSuccess);
 
-    history.push({ tool, input, output: trimmedOutput });
-
-    const result: StepResult = {
-      step: stepNum,
-      thought,
-      tool,
-      input,
-      output,
-      success: stepSuccess,
-    };
+    const result: StepResult = { step: stepNum, thought, tool, input, output: rawOutput, success: stepSuccess };
     steps.push(result);
     onStep?.(result);
 
-    // 4. Max-steps guard
+    // Save checkpoint after successful recording
+    checkpointMgr.save({
+      goalId,
+      goal,
+      stepNum,
+      state,
+      timestamp: Date.now(),
+    });
+
     if (stepNum === maxSteps) {
-      finalAnswer = `Reached maximum step limit (${maxSteps}). Last output:\n${output}`;
+      finalAnswer = `Reached ${maxSteps} step limit. Last: ${state.recentSteps.at(-1)?.outputSummary ?? rawOutput.slice(0, 200)}`;
+      checkpointMgr.cleanup(goalId);
     }
   }
 
-  return {
-    goal,
-    steps,
-    finalAnswer,
-    success,
-    stepsUsed: steps.length,
-  };
+  return { goal, steps, finalAnswer, success, stepsUsed: steps.length };
 }

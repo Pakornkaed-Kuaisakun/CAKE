@@ -31,7 +31,7 @@ export function buildVdbCommands(collections: string[]): CommandSuggestion[] {
   return [
     // ── Query / search ───────────────────────────────────────────────────────
     {
-      command: "vdb_query <collection>",
+      command: "vdb_query <collection> <question>",
       description: "Semantic search in a collection + AI answer",
       parameters: [colParams],
     },
@@ -42,12 +42,12 @@ export function buildVdbCommands(collections: string[]): CommandSuggestion[] {
 
     // ── Add / ingest ─────────────────────────────────────────────────────────
     {
-      command: "vdb_add <collection>",
+      command: "vdb_add <collection> <text>",
       description: "Add a text snippet to a collection",
       parameters: [colParams],
     },
     {
-      command: "vdb_ingest <collection>",
+      command: "vdb_ingest <collection> <path>",
       description: "Ingest a PDF/DOCX/TXT file into a collection (chunked)",
       parameters: [colParams],
     },

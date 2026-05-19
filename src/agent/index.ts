@@ -10,7 +10,6 @@ import { matchRoute, isChatFastPath } from "./router.js";
 import { aiIntentRouter } from "./AiRouter.js";
 import { intentMap } from "./intentMap.js";
 import { preClassify } from "./preClassifier.js";
-import { SYSTEM_PROMPT } from "../config/constants.js";
 import { initCronManager } from "./handlers/cron.js";
 import { ResponseCache } from "./responseCache.js";
 import { getFastModel } from "../providers/utils.js";
@@ -19,6 +18,17 @@ import { clearIntentCache } from "./intentCache.js";
 import { loadAllPlugins } from "./plugins/loader.js";
 import { registerPlugins } from "./plugins/registry.js";
 import { UserAwarenessManager } from "../modules/userAwareness/index.js";
+import { compressToolOutput } from "./toolOutputCompresser.js";
+import { classifyComplexity } from "./complexityClassifier.js";
+import { TokenBudgetTracker } from "./tokenBudgetTracker.js";
+import {
+  STATIC_CORE_PROMPT,
+  buildProfileLayer,
+  buildRetrievedContextLayer,
+  assembleSystemPrompt,
+} from "./promptAssembler.js";
+
+export { TokenBudgetTracker } from "./tokenBudgetTracker.js";
 
 export interface AgentResponse {
   text: string;
@@ -56,6 +66,7 @@ export class CakeAgent {
   private fastModel: string | undefined;
   private responseCache: ResponseCache;
   private awareness: UserAwarenessManager;
+  private budgetTracker = new TokenBudgetTracker();
 
   constructor(
     provider: AIProvider,
@@ -235,89 +246,31 @@ export class CakeAgent {
         const cached = this.responseCache.get(cacheKey);
         if (cached) return cached;
       }
-      const result = await aiHandler(this.provider, trimmed, this.fastModel);
-      const response = { text: result.text, usage: result.usage };
+
+      // After getting tool result:
+      const rawResult = await aiHandler(this.provider, trimmed, this.fastModel);
+      const compressed = compressToolOutput(intent, rawResult.text);
+
+      // Store FULL output in vector memory
+      this.rememberAsync(compressed.fullOutput, { source: 'tool', tool: intent });
+
+      // Return compressed summary to conversation history
+      const response = { text: rawResult.text, usage: rawResult.usage };
+
+      // IMPORTANT: what goes into history should be the summary, not the full output
+      // This requires separating "what we show user" from "what we add to history"
+      this.history.push('assistant', compressed.summary);
+
+      if (rawResult.usage) {
+        this.budgetTracker.record(rawResult.usage.inputTokens + rawResult.usage.outputTokens);
+      }
+
       if (!UNCACHEABLE_INTENTS.has(intent))
         this.responseCache.set(cacheKey, response);
-      return response;
     }
 
     // ── 4) Fallback ───────────────────────────────────────────────────────────
     return this.runChat(trimmed, opts);
-  }
-
-  private isComplexTask(input: string): boolean {
-    if (process.env.CAKE_DEBUG === "true") return true;
-
-    const trimmed = input.trim();
-    if (trimmed.length < 25) return false;
-
-    const lower = trimmed.toLowerCase();
-
-    // Direct simple conversational phrases or greetings
-    const simpleConversations = [
-      "hello",
-      "hi",
-      "hey",
-      "how are you",
-      "what is your name",
-      "who are you",
-      "thank you",
-      "thanks",
-      "bye",
-      "good morning",
-      "good afternoon",
-      "good evening",
-      "สวัสดี",
-      "ขอบคุณ",
-      "หวัดดี",
-      "สบายดีไหม",
-    ];
-
-    if (simpleConversations.some((c) => lower.startsWith(c) || lower === c)) {
-      return false;
-    }
-
-    // Key terms that imply programming, math, logic, analysis, or detailed explanation
-    const complexKeywords = [
-      "code",
-      "program",
-      "script",
-      "implement",
-      "function",
-      "class",
-      "algorithm",
-      "solve",
-      "calculate",
-      "math",
-      "logic",
-      "proof",
-      "debug",
-      "error",
-      "fix",
-      "why",
-      "how to",
-      "explain",
-      "compare",
-      "analyze",
-      "evaluate",
-      "design",
-      "architecture",
-      "วิเคราะห์",
-      "อธิบาย",
-      "แก้ปัญหา",
-      "เขียนโค้ด",
-      "โปรแกรม",
-      "สูตร",
-      "สมการ",
-    ];
-
-    if (complexKeywords.some((keyword) => lower.includes(keyword))) {
-      return true;
-    }
-
-    // Default to true for long queries as they generally request comprehensive details
-    return trimmed.length > 80;
   }
 
   // ─── Unified chat runner ────────────────────────────────────────────────────
@@ -325,50 +278,73 @@ export class CakeAgent {
     input: string,
     opts: RunOptions,
   ): Promise<AgentResponse> {
-    let contextString = "";
+    let memories: string[] = [];
     if (input.length > 30 && this.provider.embed) {
-      const relevantContext = await Promise.race([
+      memories = await Promise.race([
         this.memory.retrieve(input),
         new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 600)),
       ]);
-      if (relevantContext.length > 0) {
-        contextString =
-          "\n\nRelevant context from past interactions:\n" +
-          relevantContext.map((c) => `- ${c}`).join("\n");
-      }
     }
 
     this.history.push("user", input);
 
-    const shouldThink = this.isComplexTask(input);
-
+    const complexity = classifyComplexity(input);
     const awarenessContext = this.awareness.getContextString(input);
 
+    // Build the prompt layers
+    const layers = {
+      staticCore: STATIC_CORE_PROMPT,
+      profileSnapshot: buildProfileLayer(this.awareness.getSummary()),
+      retrievedContext: buildRetrievedContextLayer(memories),
+    };
+
+    // System prompt only contains staticCore and profileSnapshot to maximize caching
+    const systemPrompt = assembleSystemPrompt({
+      staticCore: layers.staticCore,
+      profileSnapshot: layers.profileSnapshot,
+      retrievedContext: "",
+    });
+
     const chatOpts = {
-      systemPrompt: SYSTEM_PROMPT + contextString + awarenessContext,
+      systemPrompt,
       model: this.model,
       signal: opts.signal,
-      maxTokens: shouldThink ? 4096 : 1024,
+      maxTokens: complexity.maxTokens,
       thinking: {
-        enabled: shouldThink,
-        budgetTokens: shouldThink ? 2048 : 0,
+        enabled: complexity.thinkingBudget > 0,
+        budgetTokens: complexity.thinkingBudget,
       },
     };
+
+    // Enrich the latest user message with Layer 3 (retrieved memories).
+    // This keeps the system prompt static while still providing full dynamic context.
+    const messages = this.history.getAll();
+    if (messages.length > 0 && messages[messages.length - 1].role === "user") {
+      let enrichedContent = input;
+      if (layers.retrievedContext) {
+        enrichedContent += `\n\n${layers.retrievedContext.trim()}`;
+      }
+      messages[messages.length - 1].content = enrichedContent;
+    }
 
     const result =
       opts.onChunk && this.provider.stream
         ? await this.provider.stream(
-            this.history.getAll(),
+            messages,
             chatOpts,
             opts.onChunk,
           )
-        : await this.provider.chat(this.history.getAll(), chatOpts);
+        : await this.provider.chat(messages, chatOpts);
 
     this.history.push("assistant", result.text);
     this.awareness.observe(input, result.text);
     this.rememberAsync(`User: ${input}\nAssistant: ${result.text}`, {
       source: "conversation",
     });
+
+    if (result.usage) {
+      this.budgetTracker.record(result.usage.inputTokens + result.usage.outputTokens);
+    }
 
     return { text: result.text, usage: result.usage };
   }

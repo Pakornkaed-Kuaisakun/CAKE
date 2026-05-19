@@ -119,6 +119,7 @@ export function useAgent() {
 
   const [providerName, setProviderName] = useState<ProviderName>(INIT_PROVIDER);
   const [model, setModel] = useState<string | undefined>(INIT_MODEL);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
   const addMsg = useCallback(
@@ -206,6 +207,11 @@ export function useAgent() {
       const trimmed = value.trim();
       if (!trimmed) return;
       setInput("");
+      setCommandHistory((prev) => {
+        const last = prev[prev.length - 1];
+        if (last === trimmed) return prev;
+        return [...prev, trimmed];
+      });
       if (interceptPermission(trimmed)) return;
       // Intercept locker multi-step flow
       if (
@@ -865,5 +871,6 @@ export function useAgent() {
     registerVoice,
     locker,
     addMsg,
+    commandHistory,
   };
 }

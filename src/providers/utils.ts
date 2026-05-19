@@ -20,3 +20,24 @@ export function getFastModel(provider: ProviderName): string | undefined {
       return undefined;
   }
 }
+
+/**
+ * Returns the full/most powerful model name for a given provider.
+ * Ideal for complex tool execution, programming, and analysis.
+ */
+export function getFullModel(provider: ProviderName): string | undefined {
+  switch (provider) {
+    case "openai":
+      return "gpt-4o";
+    case "claude":
+      return "claude-sonnet-4-6";
+    case "gemini":
+      return "gemini-2.5-pro";
+    case "ollama":
+      return "llama3:8b";
+    case "openrouter":
+      return "nvidia/nemotron-3-nano-30b-a3b:free";
+    default:
+      return undefined;
+  }
+}

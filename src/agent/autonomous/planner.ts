@@ -32,28 +32,9 @@ function buildSystemPrompt(): string {
     9. Keep "input" concise but complete — it is passed directly to the tool.`;
 }
 
-function buildUserMessage(
-  goal: string,
-  history: Array<{ tool: string; input: string; output: string }>,
-): string {
-  let msg = `GOAL: ${goal}\n\n`;
-
-  if (history.length === 0) {
-    msg += "This is the first step. Start working towards the goal.";
-  } else {
-    msg += "STEPS TAKEN SO FAR:\n";
-    for (const h of history) {
-      msg += `\nTool: ${h.tool}\nInput: ${h.input.slice(0, 200)}${h.input.length > 200 ? "…" : ""}\nOutput: ${h.output.slice(0, 600)}${h.output.length > 600 ? "…" : ""}\n`;
-    }
-    msg += "\nWhat should be the NEXT step to complete the goal?";
-  }
-  return msg;
-}
-
 export async function planNextStep(
   provider: AIProvider,
-  goal: string,
-  history: Array<{ tool: string; input: string; output: string }>,
+  plannerMessage: string,
   model?: string,
 ): Promise<ThoughtStep> {
   const fastModel = model || getFastModel(provider.name);
@@ -61,7 +42,7 @@ export async function planNextStep(
   const result = await provider.chat(
     [
       { role: "system", content: buildSystemPrompt() },
-      { role: "user", content: buildUserMessage(goal, history) },
+      { role: "user", content: plannerMessage },
     ],
     { model: fastModel, temperature: 0.2, maxTokens: 1000 },
   );
@@ -75,7 +56,7 @@ export async function planNextStep(
   const retry = await provider.chat(
     [
       { role: "system", content: buildSystemPrompt() },
-      { role: "user", content: buildUserMessage(goal, history) },
+      { role: "user", content: plannerMessage },
       { role: "assistant", content: result.text },
       {
         role: "user",

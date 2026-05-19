@@ -1,5 +1,5 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { executeAutonomous } from "../autonomous/index.js";
+import { executeHybridAutonomous } from "../autonomous/index.js";
 import { AGENT_TOOLS } from "../autonomous/toolRegistry.js";
 import { text } from "../utils/text.js";
 
@@ -36,7 +36,7 @@ export async function handleAutonomous(
   const header = `[AGENT] Goal: ${goal}\n${"─".repeat(50)}\n`;
   const stepLines: string[] = [];
 
-  const result = await executeAutonomous(provider, goal, {
+  const result = await executeHybridAutonomous(provider, goal, {
     maxSteps: 10,
     model,
     onStep: (step) => {

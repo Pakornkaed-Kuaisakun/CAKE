@@ -1,6 +1,4 @@
-// src/cli/components/InputBar.tsx
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 import { Box, Text, useInput } from "ink";
 
@@ -25,6 +23,7 @@ interface Props {
   masked?: boolean;
   onCancelLocker?: () => void;
   lockerActive?: boolean;
+  commandHistory?: string[];
 }
 
 export function InputBar({
@@ -35,12 +34,25 @@ export function InputBar({
   masked,
   onCancelLocker,
   lockerActive,
+  commandHistory = [],
 }: Props) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const tempInputRef = useRef("");
+
   const rawSuggestions = useAutocomplete(value);
-  const suggestions = masked ? [] : rawSuggestions;
+  const suggestions = (masked || historyIndex !== null) ? [] : rawSuggestions;
   const { theme } = useTheme();
 
-  const [selectedIndex, setSelectedIndex] = useState(0);
+  useEffect(() => {
+    if (
+      historyIndex !== null &&
+      commandHistory &&
+      value !== commandHistory[historyIndex]
+    ) {
+      setHistoryIndex(null);
+    }
+  }, [value, historyIndex, commandHistory]);
 
   /**
    * Reset selection when input changes
@@ -59,6 +71,38 @@ export function InputBar({
       onCancelLocker();
       onChange("");
       return;
+    }
+
+    // ── History Navigation (Up/Down Arrow when suggestions are empty) ───────
+    if (!loading && suggestions.length === 0 && commandHistory.length > 0) {
+      if (key.upArrow) {
+        if (historyIndex === null) {
+          tempInputRef.current = value;
+          const nextIndex = commandHistory.length - 1;
+          setHistoryIndex(nextIndex);
+          onChange(commandHistory[nextIndex]);
+        } else if (historyIndex > 0) {
+          const nextIndex = historyIndex - 1;
+          setHistoryIndex(nextIndex);
+          onChange(commandHistory[nextIndex]);
+        }
+        return;
+      }
+
+      if (key.downArrow) {
+        if (historyIndex !== null) {
+          const nextIndex = historyIndex + 1;
+          if (nextIndex < commandHistory.length) {
+            setHistoryIndex(nextIndex);
+            onChange(commandHistory[nextIndex]);
+          } else {
+            setHistoryIndex(null);
+            onChange(tempInputRef.current);
+            tempInputRef.current = "";
+          }
+        }
+        return;
+      }
     }
 
     if (loading || suggestions.length === 0) {

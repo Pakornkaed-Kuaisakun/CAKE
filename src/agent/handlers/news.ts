@@ -28,10 +28,42 @@ export async function handleNews(
     );
   }
 
-  // 3. Summarize and build digest
-  const items = await Promise.all(
-    articles.slice(0, 10).map((a) => summarizeArticle(provider, a, model)),
-  );
+  // 3. Summarize and build digest (utilizing Batch API for Claude Provider for 50% cost savings)
+  const sliced = articles.slice(0, 10);
+  let items: import("../../modules/news/summarize.js").NewsItem[] = [];
+
+  if (provider.name === "claude" && typeof (provider as any).runBatch === "function") {
+    const batchRequests = sliced.map((a, i) => ({
+      customId: `article-${i}`,
+      messages: [{
+        role: "user" as const,
+        content: `Summarize this news article in 1-2 sentences:\n\nTitle: ${a.title}\n\n${a.content.slice(0, 1500)}`
+      }],
+      options: { model }
+    }));
+
+    try {
+      const batchResults = await (provider as any).runBatch(batchRequests, { intervalMs: 2000 });
+      items = sliced.map((a, i) => {
+        const res = batchResults.find((r: any) => r.customId === `article-${i}`);
+        return {
+          title: a.title,
+          source: a.source,
+          link: a.link,
+          summary: res?.result?.text || "No summary available.",
+        };
+      });
+    } catch {
+      // Fallback
+      items = await Promise.all(
+        sliced.map((a) => summarizeArticle(provider, a, model)),
+      );
+    }
+  } else {
+    items = await Promise.all(
+      sliced.map((a) => summarizeArticle(provider, a, model)),
+    );
+  }
 
   const digest = await buildDigest(provider, items, model);
   const list = items.map((i) => `  • [${i.source}] ${i.title}`).join("\n");

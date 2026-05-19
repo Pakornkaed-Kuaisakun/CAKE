@@ -24,6 +24,7 @@ import {
 } from "./store.js";
 import { extractSignals, generateProfileSummary } from "./extractor.js";
 import type { UserProfile } from "./types.js";
+import { buildProfileLayer } from "../../agent/promptAssembler.js";
 
 export type { UserProfile, UserSignal, SignalCategory } from "./types.js";
 
@@ -38,6 +39,9 @@ export class UserAwarenessManager {
   private newSinceLastSummary = 0;
   /** Debounce: skip extraction for very short messages */
   private readonly MIN_MESSAGE_LENGTH = 12;
+  private cachedProfileLayer = "";
+  private profileLayerVersion = 0;
+  private lastSignalCount = 0;
 
   constructor(provider: AIProvider, model?: string) {
     this.provider = provider;
@@ -119,28 +123,18 @@ export class UserAwarenessManager {
 
   // ── Context injection ──────────────────────────────────────────────────────
 
-  /**
-   * Returns a short string to append to the system prompt.
-   * Empty string if the profile has too few signals or low confidence.
-   */
   getContextString(query: string): string {
-    if (this.profile.signals.length < 3) return "";
+    // Only regenerate the profile layer when signal count changes significantly
+    const currentSignalCount = this.profile.signals.length;
+    if (currentSignalCount !== this.lastSignalCount) {
+      this.cachedProfileLayer = buildProfileLayer(this.profile.summary);
+      this.lastSignalCount = currentSignalCount;
+    }
 
-    const relevant = getRelevantSignals(this.profile, query, 12);
-    if (relevant.length === 0) return "";
-
-    const lines = relevant
-      .filter((s) => s.confidence >= 0.4)
-      .map((s) => `• [${s.category}] ${s.fact}`)
-      .join("\n");
-
-    if (!lines) return "";
-
-    return (
-      `\n\n── User Profile (learned from past interactions) ──\n` +
-      lines +
-      `\nAdapt your response style and content to match the above.`
-    );
+    // Retrieved context is always per-query (small, relevant)
+    // This is what changes every turn — keep it OUT of the cached system block
+    return this.cachedProfileLayer;
+    // NOTE: retrieved context goes in the USER message, not system prompt
   }
 
   /**

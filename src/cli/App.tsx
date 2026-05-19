@@ -35,6 +35,7 @@ export function App() {
     registerVoice,
     locker,
     addMsg,
+    commandHistory,
   } = useAgent();
 
   // BUG FIX: useVoice's speakText and makeSpeakingOnChunk signatures changed.
@@ -114,6 +115,7 @@ export function App() {
           addMsg("system", "🔐 Locker flow cancelled.");
         }}
         lockerActive={locker.lockerState.step !== "idle"}
+        commandHistory={commandHistory}
       />
 
       {/* ── Session token/cost footer ── */}
