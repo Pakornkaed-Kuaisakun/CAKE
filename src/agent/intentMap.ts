@@ -2,10 +2,13 @@ import * as H from "./handlers/index.js";
 import type { AIProvider, ChatResult } from "../providers/types.js";
 import { getPluginIntentMap } from "./plugins/index.js";
 
+import type { RunOptions } from "./index.js";
+
 export type Handler = (
   provider: AIProvider,
   input: string,
   model?: string,
+  options?: RunOptions,
 ) => Promise<ChatResult>;
 
 export const BASE_INTENT_MAP: Record<string, Handler> = {

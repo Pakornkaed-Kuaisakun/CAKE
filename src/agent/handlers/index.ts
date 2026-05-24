@@ -12,6 +12,7 @@ export * from "./notify.js";
 export * from "./finance.js";
 export * from "./weather.js";
 export * from "./export.js";
+export * from "./chatExport.js";
 export * from "./security.js";
 export * from "./chat.js";
 export * from "./bash.js";

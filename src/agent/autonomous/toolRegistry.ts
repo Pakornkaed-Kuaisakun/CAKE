@@ -1,3 +1,4 @@
+// src/agent/autonomous/toolRegistry.ts
 import type { AIProvider } from "../../providers/types.js";
 import type { AgentTool } from "./types.js";
 import * as H from "../handlers/index.js";
@@ -132,8 +133,18 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "export",
     description:
-      "Save text content to a file in the 'reports/' folder. Format: export <format> <filename>|<content> — the | separates the filename from the content. Supports: txt, md, json, csv, html.",
+      "Save text content to a file in the 'reports/' folder. Format: export <format> <filename>|<content> — the | separates the filename from the content. Supports: txt, md, json, csv, html. IMPORTANT: Put the COMPLETE content after |, never truncate.",
     example: "export md report.md|# My Report\n\nContent goes here...",
+  },
+  {
+    name: "chat_export",
+    description:
+      "Ask the AI to compose content AND immediately save it to a file — all in one step. " +
+      "Use this instead of 'chat' + 'export' when writing long documents (reports, essays, summaries). " +
+      "Format: chat_export <format> <filename>|<prompt describing what to write>. " +
+      "The AI writes the full content from the prompt and saves it — you do NOT need to include the content inline. " +
+      "PREFER this tool over the two-step chat→export pattern.",
+    example: "chat_export md ukraine_war.md|Write a comprehensive report on the Ukraine-Russia war covering its origins, key events, humanitarian impact, and current status",
   },
   {
     name: "finance",
@@ -155,8 +166,9 @@ export const AGENT_TOOLS: AgentTool[] = [
   {
     name: "chat",
     description:
-      "Ask the AI a question or request a piece of written content. Use this for reasoning, summarising, writing, or answering questions that don't need another tool.",
-    example: "chat Summarise the key risks in the following text: ...",
+      "Ask the AI a question or request written content. Use this for reasoning, writing reports, summarising, or answering questions. Returns the FULL complete text — never truncated. Use the full output directly as content for an export step.",
+    example:
+      "chat Write a comprehensive report on TypeScript ORMs covering Prisma, TypeORM, MikroORM, Drizzle",
   },
   {
     name: "finish",
@@ -172,7 +184,18 @@ export type ToolRunner = (
   model?: string,
 ) => Promise<string>;
 
-/** Maps tool name -> CAKE handler (returns plain string)  */
+/**
+ * Maps tool name -> CAKE handler (returns plain string).
+ *
+ * BUG FIX: The chat tool runner previously went through a wrap() helper that
+ * returned res.text — which is correct. However, the executionState layer then
+ * compressed that text to 120 chars before storing in recentSteps, so when the
+ * planner built the next step's context it only saw the truncated summary and
+ * wrote THAT into the export file.
+ *
+ * The fix is in executionState.ts (fullOutput field), but we also explicitly
+ * document here that chat's raw string output must NOT be truncated by callers.
+ */
 export function getToolRunner(toolName: string): ToolRunner | null {
   const wrap =
     (
@@ -180,6 +203,9 @@ export function getToolRunner(toolName: string): ToolRunner | null {
     ): ToolRunner =>
     async (provider, input, model) => {
       const res = await fn(provider, input, model);
+      // Return the COMPLETE text — compression happens only in executionState
+      // for the planner context display, never for the actual tool output passed
+      // between steps.
       return res.text;
     };
 
@@ -234,6 +260,8 @@ export function getToolRunner(toolName: string): ToolRunner | null {
       return wrap(H.handleAskDocument);
     case "export":
       return wrap(H.handleExport);
+    case "chat_export":
+      return wrap(H.handleChatExport);
     case "finance":
       return wrap(H.handleFinanceReport);
     case "email":

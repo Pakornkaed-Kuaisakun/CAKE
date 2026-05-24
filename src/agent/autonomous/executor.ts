@@ -20,8 +20,8 @@ export interface ExecutorOptions {
   /** Called after each step so the CLI can stream progress  */
   onStep?: (step: StepResult) => void;
   model?: string;
-  plannerModel?: string;  // Fast model for planning decisions
-  workerModel?: string;   // Full model for complex tool tasks
+  plannerModel?: string; // Fast model for planning decisions
+  workerModel?: string; // Full model for complex tool tasks
   signal?: AbortSignal;
 }
 
@@ -30,11 +30,20 @@ export async function executeAutonomous(
   goal: string,
   options: ExecutorOptions = {},
 ): Promise<AutonomousResult> {
-  const { maxSteps = 20, onStep, model, plannerModel, workerModel, signal } = options;
+  const {
+    maxSteps = 20,
+    onStep,
+    model,
+    plannerModel,
+    workerModel,
+    signal,
+  } = options;
 
   // Dynamically resolve appropriate models based on the active provider
-  const resolvedPlannerModel = plannerModel || getFastModel(provider.name) || model;
-  const resolvedWorkerModel = workerModel || model || getFullModel(provider.name);
+  const resolvedPlannerModel =
+    plannerModel || getFastModel(provider.name) || model;
+  const resolvedWorkerModel =
+    workerModel || model || getFullModel(provider.name);
 
   const goalId = crypto.createHash("sha256").update(goal).digest("hex");
   const checkpointMgr = new CheckpointManager();
@@ -51,14 +60,14 @@ export async function executeAutonomous(
     state = {
       goal,
       completedSteps: [],
-      progressSummary: '',
+      progressSummary: "",
       recentSteps: [],
       failedTools: new Set(),
     };
   }
 
   const steps: StepResult[] = [];
-  
+
   // Reconstruct step results if resuming
   if (existing) {
     for (const step of state.completedSteps) {
@@ -73,7 +82,7 @@ export async function executeAutonomous(
     }
   }
 
-  let finalAnswer = '';
+  let finalAnswer = "";
   let success = false;
 
   for (let stepNum = startStep; stepNum <= maxSteps; stepNum++) {
@@ -89,7 +98,11 @@ export async function executeAutonomous(
 
     let planned;
     try {
-      planned = await planNextStep(provider, plannerMessage, resolvedPlannerModel);
+      planned = await planNextStep(
+        provider,
+        plannerMessage,
+        resolvedPlannerModel,
+      );
     } catch (err: any) {
       finalAnswer = `Stopped: planner error: ${err.message}`;
       break;
@@ -97,15 +110,38 @@ export async function executeAutonomous(
 
     const { thought, tool, input } = planned;
 
-    if (tool === 'finish') {
+    if (tool === "finish") {
       finalAnswer = input;
       success = true;
-      steps.push({ step: stepNum, thought, tool, input, output: input, success: true });
-      onStep?.({ step: stepNum, thought, tool, input, output: input, success: true });
+      steps.push({
+        step: stepNum,
+        thought,
+        tool,
+        input,
+        output: input,
+        success: true,
+      });
+      onStep?.({
+        step: stepNum,
+        thought,
+        tool,
+        input,
+        output: input,
+        success: true,
+      });
       checkpointMgr.cleanup(goalId);
       break;
     }
 
+    // ── BUG FIX: export tool routing ──────────────────────────────────────────
+    // The planner emits input like: "export md report.md|# Title\n\nContent..."
+    // When the tool runner calls handleExport, it receives the full input string.
+    // handleExport internally does: withoutVerb = input.replace(/^export\s+/i, "")
+    // So we must NOT pre-strip "export" here — pass the full input as-is.
+    // This ensures the content after "|" is never truncated or lost.
+    //
+    // For other tools, input is also passed verbatim; each handler strips its
+    // own verb prefix via its own regex (see handlers/bash.ts, file.ts, etc.).
     const runner = getToolRunner(tool);
     let rawOutput: string;
     let stepSuccess = true;
@@ -115,6 +151,8 @@ export async function executeAutonomous(
       stepSuccess = false;
     } else {
       try {
+        // Pass full input — do NOT mutate or truncate it.
+        // The export handler's inline "|" split must receive the complete string.
         rawOutput = await runner(provider, input, resolvedWorkerModel);
       } catch (err: any) {
         rawOutput = `Tool error: ${err.message}`;
@@ -125,7 +163,14 @@ export async function executeAutonomous(
     // Compress output before storing in state
     recordStep(state, stepNum, tool, input, rawOutput, stepSuccess);
 
-    const result: StepResult = { step: stepNum, thought, tool, input, output: rawOutput, success: stepSuccess };
+    const result: StepResult = {
+      step: stepNum,
+      thought,
+      tool,
+      input,
+      output: rawOutput,
+      success: stepSuccess,
+    };
     steps.push(result);
     onStep?.(result);
 

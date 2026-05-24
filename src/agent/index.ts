@@ -174,7 +174,7 @@ export class CakeAgent {
       if (regexHandler) {
         const cached = this.responseCache.get(cacheKey);
         if (cached) return cached;
-        const result = await regexHandler(this.provider, trimmed, this.model);
+        const result = await regexHandler(this.provider, trimmed, this.model, opts);
         const response = { text: result.text, usage: result.usage };
         this.maybeCacheToolResult(cacheKey, trimmed, response);
         this.rememberAsync(`User asked: ${trimmed}\nResult: ${result.text}`, {
@@ -204,6 +204,7 @@ export class CakeAgent {
             this.provider,
             trimmed,
             this.model,
+            opts,
           );
           const response = { text: result.text, usage: result.usage };
           if (!UNCACHEABLE_INTENTS.has(candidate))
@@ -227,7 +228,7 @@ export class CakeAgent {
     if (regexHandler) {
       const cached = this.responseCache.get(cacheKey);
       if (cached) return cached;
-      const result = await regexHandler(this.provider, trimmed, this.model);
+      const result = await regexHandler(this.provider, trimmed, this.model, opts);
       const response = { text: result.text, usage: result.usage };
       this.maybeCacheToolResult(cacheKey, trimmed, response);
       if (result.text.length > 50) {
@@ -248,7 +249,7 @@ export class CakeAgent {
       }
 
       // After getting tool result:
-      const rawResult = await aiHandler(this.provider, trimmed, this.fastModel);
+      const rawResult = await aiHandler(this.provider, trimmed, this.fastModel, opts);
       const compressed = compressToolOutput(intent, rawResult.text);
 
       // Store FULL output in vector memory

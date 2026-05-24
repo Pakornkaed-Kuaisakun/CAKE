@@ -1,11 +1,13 @@
 import type { AIProvider, ChatResult } from "../providers/types.js";
 import * as H from "./handlers/index.js";
 import { matchPluginRoute } from "./plugins/index.js";
+import type { RunOptions } from "./index.js";
 
 export type Handler = (
   provider: AIProvider,
   input: string,
   model?: string,
+  options?: RunOptions,
 ) => Promise<ChatResult>;
 
 interface Route {

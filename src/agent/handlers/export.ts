@@ -69,19 +69,19 @@ function convertContent(content: string, format: ExportFormat): string {
         .replace(/>/g, "&gt;");
       const withBreaks = escaped.replace(/\n/g, "<br>\n");
       return `<!DOCTYPE html>
-<html lang="en">
-    <head>
-    <meta charset="UTF-8">
-    <title>CAKE Export</title>
-    <style>
-        body { font-family: monospace; padding: 2rem; max-width: 900px; margin: 0 auto; }
-        pre  { white-space: pre-wrap; word-break: break-word; }
-    </style>
-    </head>
-    <body>
-        <pre>${withBreaks}</pre>
-    </body>
-</html>`;
+      <html lang="en">
+          <head>
+          <meta charset="UTF-8">
+          <title>CAKE Export</title>
+          <style>
+              body { font-family: monospace; padding: 2rem; max-width: 900px; margin: 0 auto; }
+              pre  { white-space: pre-wrap; word-break: break-word; }
+          </style>
+          </head>
+          <body>
+              <pre>${withBreaks}</pre>
+          </body>
+      </html>`;
     }
     default:
       return content;
@@ -127,6 +127,7 @@ export async function exportSink(
   _command: string,
   rawArgs: string,
 ): Promise<ChatResult> {
+  // rawArgs is everything before the "|", e.g. "md report.md" or "txt output"
   const parts = rawArgs.trim().split(/\s+/);
   const formatToken = parts[0]?.toLocaleLowerCase() ?? "txt";
   const format: ExportFormat = FORMAT_ALIASES[formatToken] ?? "txt";
@@ -136,7 +137,6 @@ export async function exportSink(
   const converted = convertContent(content, format);
 
   // ── Permission check ────────────────────────────────────────────────────────
-  // export defaults to "allow" in permissions, but respect whatever level is set
   const ask = _askHandler ?? defaultAskHandler;
   const guard = await guardOperation(
     {
@@ -156,7 +156,7 @@ export async function exportSink(
 
   const sizeKb = (Buffer.byteLength(converted, "utf-8") / 1024).toFixed(1);
   return {
-    text: `✅ Exported to ${outPath}\n   Format: ${format.toUpperCase()} | Size: ${sizeKb} KB`,
+    text: `✅ Exported to ${outPath}\n  Format: ${format.toUpperCase()} | Size: ${sizeKb} KB`,
   };
 }
 
@@ -167,9 +167,11 @@ export async function handleExport(
   input: string,
   _model?: string,
 ): Promise<ChatResult> {
+  // Strip leading "export " verb if present (idempotent — safe to call always)
   const withoutVerb = input.replace(/^export\s+/i, "").trim();
 
-  // Pipeline marker
+  // ── BUG FIX: Pipeline marker ──────────────────────────────────────────────
+  // Pipeline sends content via "__pipe__:" marker
   const pipeMarker = "__pipe__:";
   const pipeIdx = withoutVerb.indexOf(pipeMarker);
   if (pipeIdx !== -1) {
@@ -178,10 +180,14 @@ export async function handleExport(
     return exportSink(content, "export", rawArgs);
   }
 
-  // Inline content
+  // ── BUG FIX: Inline content after "|" ────────────────────────────────────
+  // The planner emits: "md report.md|# Title\n\nFull content here..."
+  // We must split on the FIRST "|" only — the content body may itself contain
+  // "|" characters (tables, code, etc.), so indexOf is safer than split("|").
   const inlineIdx = withoutVerb.indexOf("|");
   if (inlineIdx !== -1) {
     const rawArgs = withoutVerb.slice(0, inlineIdx).trim();
+    // Take EVERYTHING after the first "|" as content — do not truncate
     const content = withoutVerb.slice(inlineIdx + 1);
     if (content.trim()) {
       return exportSink(content, "export", rawArgs);
