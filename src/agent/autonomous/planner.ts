@@ -15,6 +15,8 @@ function buildSystemPrompt(): string {
     ${toolList}
 
     RULES:
+    - Preference: Use lightweight, low-latency tools for quick lookups. Use "search" for single-answer or quick evidence lookups. Use "deep_search" only when comprehensive, multi-step research or synthesis is required. (Use Deep Search when necessary.)
+
     1. Output ONLY a JSON object — no extra text, no markdown fences.
     2. The JSON must have exactly three fields (IMPORTANT):
       { "thought": "<reasoning>", "tool": "<tool name>", "input": "<exact string to pass>" }

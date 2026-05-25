@@ -1,5 +1,5 @@
 // src/agent/promptAssembler.ts
-import { SYSTEM_PROMPT } from "../config/constants.js";
+import { SYSTEM_PROMPT, HALLUCINATION_PREVENTION } from "../config/constants.js";
 
 export interface PromptLayers {
   /**
@@ -24,7 +24,9 @@ export interface PromptLayers {
   retrievedContext: string;
 }
 
-export const STATIC_CORE_PROMPT = SYSTEM_PROMPT.trim();
+export const STATIC_CORE_PROMPT = (
+  SYSTEM_PROMPT + "\n\n" + HALLUCINATION_PREVENTION
+).trim();
 
 // This is rebuilt only when profile.summary changes (every N signals)
 export function buildProfileLayer(profileSummary: string): string {

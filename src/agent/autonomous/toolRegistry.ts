@@ -11,6 +11,12 @@ export const AGENT_TOOLS: AgentTool[] = [
     example: "search latest Node.js LTS version",
   },
   {
+    name: "deep_search",
+    description:
+      "(heavy — use only when necessary) Run an in-depth research workflow: planning, parallel web search, and synthesis. | deep_search <topic> (supports --export)",
+    example: "deep_search latest developments in fusion energy --export",
+  },
+  {
     name: "bash",
     description: "Run a shell command and get its output. | bash <command>",
     example: "bash ls -la src/",
@@ -147,6 +153,62 @@ export const AGENT_TOOLS: AgentTool[] = [
     example: "chat_export md ukraine_war.md|Write a comprehensive report on the Ukraine-Russia war covering its origins, key events, humanitarian impact, and current status",
   },
   {
+    name: "mcp",
+    description:
+      "Manage and inspect MCP servers, tools, and resources. Use for invoking external model-context tools or reading shared resources. | mcp <subcommand>",
+    example: "mcp_list",
+  },
+  {
+    name: "mcp_list",
+    description: "List registered MCP servers. | mcp_list",
+    example: "mcp_list",
+  },
+  {
+    name: "mcp_connect",
+    description: "Connect or reconnect to an MCP server. | mcp_connect <name>",
+    example: "mcp_connect my-server",
+  },
+  {
+    name: "mcp_disconnect",
+    description: "Disconnect from an MCP server. | mcp_disconnect <name>",
+    example: "mcp_disconnect my-server",
+  },
+  {
+    name: "mcp_add",
+    description: "Add a new MCP server (template or explicit). | mcp_add <template|name ...>",
+    example: "mcp_add filesystem",
+  },
+  {
+    name: "mcp_remove",
+    description: "Remove an MCP server from the registry. | mcp_remove <name>",
+    example: "mcp_remove my-server",
+  },
+  {
+    name: "mcp_tools",
+    description: "List available MCP tools (optionally filter by server). | mcp_tools [server]",
+    example: "mcp_tools",
+  },
+  {
+    name: "mcp_call",
+    description: "Call an MCP tool directly. | mcp_call <tool-name> [json-args]",
+    example: 'mcp_call read_file {"path":"./README.md"}',
+  },
+  {
+    name: "mcp_resources",
+    description: "List MCP-shared resources. | mcp_resources [server]",
+    example: "mcp_resources",
+  },
+  {
+    name: "mcp_read",
+    description: "Read a resource exposed by MCP. | mcp_read <resource-uri>",
+    example: "mcp_read mcp://filesystem/README.md",
+  },
+  {
+    name: "mcp_prompts",
+    description: "List prompts exposed by MCP servers. | mcp_prompts [server]",
+    example: "mcp_prompts",
+  },
+  {
     name: "finance",
     description:
       "Generate a financial report for a stock ticker. | finance <ticker>",
@@ -212,6 +274,8 @@ export function getToolRunner(toolName: string): ToolRunner | null {
   switch (toolName) {
     case "search":
       return wrap(H.handleSearch);
+    case "deep_search":
+      return wrap(H.handleDeepSearch);
     case "bash":
       return wrap(H.handleBash);
     case "file_read":
@@ -262,6 +326,32 @@ export function getToolRunner(toolName: string): ToolRunner | null {
       return wrap(H.handleExport);
     case "chat_export":
       return wrap(H.handleChatExport);
+    case "mcp":
+      return wrap(H.handleMcp);
+    case "mcp_list":
+      return wrap(H.handleMcpList);
+    case "mcp_connect":
+      return wrap(H.handleMcpConnect);
+    case "mcp_disconnect":
+      return wrap(H.handleMcpDisconnect);
+    case "mcp_add":
+      return wrap(H.handleMcpAdd);
+    case "mcp_remove":
+      return wrap(H.handleMcpRemove);
+    case "mcp_enable":
+      return wrap(H.handleMcpEnable);
+    case "mcp_disable":
+      return wrap(H.handleMcpDisable);
+    case "mcp_tools":
+      return wrap(H.handleMcpTools);
+    case "mcp_call":
+      return wrap(H.handleMcpCall);
+    case "mcp_resources":
+      return wrap(H.handleMcpResources);
+    case "mcp_read":
+      return wrap(H.handleMcpRead);
+    case "mcp_prompts":
+      return wrap(H.handleMcpPrompts);
     case "finance":
       return wrap(H.handleFinanceReport);
     case "email":
