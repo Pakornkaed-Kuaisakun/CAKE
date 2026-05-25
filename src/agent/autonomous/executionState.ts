@@ -38,10 +38,16 @@ export const WINDOW_SIZE = 3; // keep last 3 steps verbatim
 const FULL_OUTPUT_TOOLS = new Set([
   "chat",
   "search",
+  "deep_search",
   "file_read",
+  "file_summarize",
   "document_read",
+  "document_summarize",
   "export",
   "chat_export",
+  "async",
+  "async_status",
+  "async_list",
 ]);
 
 export function recordStep(

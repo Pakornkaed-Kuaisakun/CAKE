@@ -35,8 +35,11 @@ export interface PromptLayers {
   intentGuardrail?: string;
 }
 
+// Keep the static core minimal to maximize prompt cache hits and reduce tokens.
+// High-risk hallucination prevention guidance is applied separately via
+// intent-specific guardrails so it's injected only when needed.
 export const STATIC_CORE_PROMPT = (
-  SYSTEM_PROMPT + "\n\n" + RESPONSE_BREVITY_GUIDANCE + "\n\n" + HALLUCINATION_PREVENTION
+  SYSTEM_PROMPT + "\n\n" + RESPONSE_BREVITY_GUIDANCE
 ).trim();
 
 // This is rebuilt only when profile.summary changes (every N signals)

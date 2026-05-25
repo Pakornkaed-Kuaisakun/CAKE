@@ -75,7 +75,7 @@ export async function handleAsyncStatus(
   ];
   if (task.startedAt) lines.push(`Started: ${new Date(task.startedAt).toISOString()}`);
   if (task.completedAt) lines.push(`Completed: ${new Date(task.completedAt).toISOString()}`);
-  if (task.result) lines.push(`Result: ${task.result.slice(0, 200)}`);
+  if (task.result) lines.push(`Result: ${task.result.slice(0, 500)}`);
   if (task.error) lines.push(`Error: ${task.error}`);
 
   return text(lines.join("\n"));
