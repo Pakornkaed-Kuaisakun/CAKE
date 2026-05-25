@@ -272,6 +272,54 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Show locker storage info and encryption details",
   },
 
+  // ── MCP ─────────────────────────────────────────────────────────────────────
+  { command: "mcp", description: "Show MCP server status overview" },
+  { command: "mcp_list", description: "List all registered MCP servers" },
+  {
+    command: "mcp_add <template>",
+    description: "Add server from template (filesystem, memory, github...)",
+    parameters: [
+      "filesystem",
+      "memory",
+      "brave_search",
+      "github",
+      "sequential_thinking",
+      "postgres",
+      "puppeteer",
+      "slack",
+    ],
+  },
+  {
+    command: "mcp_add <name> stdio <command> [args...]",
+    description: "Add a stdio MCP server",
+  },
+  { command: "mcp_add <name> sse <url>", description: "Add an SSE MCP server" },
+  { command: "mcp_connect <name>", description: "Connect to an MCP server" },
+  {
+    command: "mcp_disconnect <name>",
+    description: "Disconnect from an MCP server",
+  },
+  {
+    command: "mcp_remove <name>",
+    description: "Remove an MCP server from registry",
+  },
+  { command: "mcp_enable <name>", description: "Enable an MCP server" },
+  { command: "mcp_disable <name>", description: "Disable an MCP server" },
+  { command: "mcp_tools [server]", description: "List available MCP tools" },
+  {
+    command: "mcp_call <tool> [json-args]",
+    description: "Call an MCP tool directly",
+  },
+  {
+    command: "mcp_resources [server]",
+    description: "List available MCP resources",
+  },
+  { command: "mcp_read <uri>", description: "Read an MCP resource by URI" },
+  {
+    command: "mcp_prompts [server]",
+    description: "List available MCP prompts",
+  },
+
   // ── Slash commands ──────────────────────────────────────────────────────────
   { command: "/help", description: "Show this help message" },
   { command: "/exit", description: "Exit the CLI" },

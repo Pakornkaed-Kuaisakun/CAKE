@@ -113,6 +113,21 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
   locker_clear: H.handleLockerClear,
   locker_info: H.handleLockerInfo,
   locker: H.handleLockerInfo, // bare "locker" → info/help
+
+  // ── MCP (Model Context Protocol) ───────────────────────────────────────────
+  mcp: H.handleMcp,
+  mcp_list: H.handleMcpList,
+  mcp_connect: H.handleMcpConnect,
+  mcp_disconnect: H.handleMcpDisconnect,
+  mcp_add: H.handleMcpAdd,
+  mcp_remove: H.handleMcpRemove,
+  mcp_enable: H.handleMcpEnable,
+  mcp_disable: H.handleMcpDisable,
+  mcp_tools: H.handleMcpTools,
+  mcp_call: H.handleMcpCall,
+  mcp_resources: H.handleMcpResources,
+  mcp_read: H.handleMcpRead,
+  mcp_prompts: H.handleMcpPrompts,
 };
 
 /**

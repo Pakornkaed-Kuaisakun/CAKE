@@ -14,6 +14,9 @@ import { useVdbCollections } from "./vdb/useVdbCollections.js";
 import { useVdbDocuments } from "./vdb/useVdbDocuments.js";
 import { useItemHints, type RemoveCommand } from "./useItemHints.js";
 import { useLockerHints } from "../hints/lockerHints.js";
+import { useMcpServers } from "./useMcpServers.js";
+import { useMcpTools } from "./useMcpTools.js";
+import { useMcpResources } from "./useMcpResources.js";
 
 function stripPlaceholders(cmd: string): string {
   const cleaned = cmd.replace(/(<[^>]+>|\[[^\]]+\])/g, "").trimEnd();
@@ -67,6 +70,38 @@ function detectLockerSlot(words: string[]): boolean {
   return false;
 }
 
+const MCP_SERVER_COMMANDS = new Set([
+  "mcp_connect",
+  "mcp_disconnect",
+  "mcp_enable",
+  "mcp_disable",
+  "mcp_remove",
+  "mcp_tools",
+  "mcp_resources",
+  "mcp_prompts",
+]);
+
+function detectMcpServerSlot(words: string[]): boolean {
+  if (words.length === 2 && MCP_SERVER_COMMANDS.has(words[0].toLowerCase())) {
+    return true;
+  }
+  return false;
+}
+
+function detectMcpCallSlot(words: string[]): boolean {
+  if (words.length === 2 && words[0].toLowerCase() === "mcp_call") {
+    return true;
+  }
+  return false;
+}
+
+function detectMcpReadSlot(words: string[]): boolean {
+  if (words.length === 2 && words[0].toLowerCase() === "mcp_read") {
+    return true;
+  }
+  return false;
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useAutocomplete(input: string) {
@@ -87,10 +122,16 @@ export function useAutocomplete(input: string) {
   const activeVdbCol = useMemo(() => detectVdbDeleteSlot(words), [words]);
   const activeRemoveCmd = useMemo(() => detectRemoveSlot(words), [words]);
   const activeLocker = useMemo(() => detectLockerSlot(words), [words]);
+  const activeMcpServer = useMemo(() => detectMcpServerSlot(words), [words]);
+  const activeMcpCall = useMemo(() => detectMcpCallSlot(words), [words]);
+  const activeMcpRead = useMemo(() => detectMcpReadSlot(words), [words]);
 
   const docHints = useVdbDocuments(activeVdbCol);
   const removeHints = useItemHints(activeRemoveCmd);
   const lockerHints = useLockerHints(activeLocker);
+  const mcpServerHints = useMcpServers();
+  const mcpToolHints = useMcpTools();
+  const mcpResourceHints = useMcpResources();
 
   // ── Merged command list ───────────────────────────────────────────────────
 
@@ -147,6 +188,58 @@ export function useAutocomplete(input: string) {
         fullCommand: prefix
           ? `${prefix} | ${words[0]} ${h.id} `
           : `${words[0]} ${h.id} `,
+      }));
+    }
+
+    // ── 1c. MCP Server commands <name> ───────────────────────────────────────
+    if (activeMcpServer && mcpServerHints.length > 0) {
+      const typed = words[1]?.toLowerCase() ?? "";
+      const matched = mcpServerHints.filter(
+        (h) => h.toLowerCase().includes(typed)
+      );
+
+      return matched.map((h) => ({
+        command: h,
+        description: `MCP Server: ${h}`,
+        fullCommand: prefix
+          ? `${prefix} | ${words[0]} ${h} `
+          : `${words[0]} ${h} `,
+      }));
+    }
+
+    // ── 1d. MCP Call <tool> ──────────────────────────────────────────────────
+    if (activeMcpCall && mcpToolHints.length > 0) {
+      const typed = words[1]?.toLowerCase() ?? "";
+      const matched = mcpToolHints.filter(
+        (h) =>
+          h.name.toLowerCase().includes(typed) ||
+          h.description.toLowerCase().includes(typed)
+      );
+
+      return matched.map((h) => ({
+        command: h.name,
+        description: `${h.description} [${h.server}]`,
+        fullCommand: prefix
+          ? `${prefix} | mcp_call ${h.name} `
+          : `mcp_call ${h.name} `,
+      }));
+    }
+
+    // ── 1e. MCP Read <uri> ──────────────────────────────────────────────────
+    if (activeMcpRead && mcpResourceHints.length > 0) {
+      const typed = words[1]?.toLowerCase() ?? "";
+      const matched = mcpResourceHints.filter(
+        (h) =>
+          h.uri.toLowerCase().includes(typed) ||
+          h.name.toLowerCase().includes(typed)
+      );
+
+      return matched.map((h) => ({
+        command: h.uri,
+        description: `Resource: ${h.name} [${h.server}]`,
+        fullCommand: prefix
+          ? `${prefix} | mcp_read ${h.uri} `
+          : `mcp_read ${h.uri} `,
       }));
     }
 
@@ -255,5 +348,11 @@ export function useAutocomplete(input: string) {
     activeRemoveCmd,
     activeLocker,
     activeVdbCol,
+    activeMcpServer,
+    mcpServerHints,
+    activeMcpCall,
+    mcpToolHints,
+    activeMcpRead,
+    mcpResourceHints,
   ]);
 }

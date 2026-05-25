@@ -181,9 +181,7 @@ function AssistantMessage({
               <Box key={index} flexDirection='column' marginY={0}>
                 <Text color={theme.text} wrap='wrap'>
                   {item.header}
-                  <Text color={theme.muted} dimColor>
-                    {indicator}
-                  </Text>
+                  <Text color={theme.muted}>{indicator}</Text>
                 </Text>
                 {isExpanded &&
                   item.details &&

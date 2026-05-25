@@ -72,6 +72,19 @@ const VALID_INTENTS = new Set([
   "locker_update",
   "locker_clear",
   "locker_info",
+  "mcp",
+  "mcp_list",
+  "mcp_connect",
+  "mcp_disconnect",
+  "mcp_add",
+  "mcp_remove",
+  "mcp_enable",
+  "mcp_disable",
+  "mcp_tools",
+  "mcp_call",
+  "mcp_resources",
+  "mcp_read",
+  "mcp_prompts",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -127,13 +140,26 @@ vdb_delete        — delete a specific document from vector database
 vdb_drop          — delete an entire vector database collection
 vdb_clear         — remove all documents from a vector database collection
 vdb_info          — show vector database collection statistics
-locker_add    — store/save a new secret key, password, token or credential
-locker_get    — retrieve/show/reveal a stored secret
-locker_list   — list all stored secrets (no values shown)
-locker_delete — delete/remove a stored secret
-locker_update — update/change a stored secret's value
-locker_clear  — wipe/clear all stored secrets
-locker_info   — show locker info and help
+locker_add        — store/save a new secret key, password, token or credential
+locker_get        — retrieve/show/reveal a stored secret
+locker_list       — list all stored secrets (no values shown)
+locker_delete     — delete/remove a stored secret
+locker_update     — update/change a stored secret's value
+locker_clear      — wipe/clear all stored secrets
+locker_info       — show locker info and help
+mcp               — Show MCP server status overview
+mcp_list          — list all MCP servers
+mcp_connect       — connect to an MCP server
+mcp_disconnect    — disconnect from an MCP server
+mcp_add           — add an MCP server
+mcp_remove        — remove an MCP server
+mcp_enable        — enable an MCP server
+mcp_disable       — disable an MCP server
+mcp_tools         — list available MCP tools
+mcp_call          — call an MCP tool directly
+mcp_resources     — list available MCP resources
+mcp_read          — read an MCP resource by URI
+mcp_prompts       — list available MCP prompts
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -175,6 +201,10 @@ EXAMPLES (input → intent):
 "reveal my password" → locker_get
 "list my keys" → locker_list
 "delete my old token" → locker_delete
+"show mcp servers" → mcp
+"add mcp filesystem server" → mcp_add
+"call mcp tool read_file" → mcp_call
+"list mcp tools" → mcp_tools
 
 `;
 

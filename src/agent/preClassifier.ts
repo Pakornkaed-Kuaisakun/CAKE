@@ -117,6 +117,19 @@ const TOOL_PREFIXES = new Set([
   "locker_update",
   "locker_clear",
   "locker_info",
+  "mcp",
+  "mcp_list",
+  "mcp_connect",
+  "mcp_disconnect",
+  "mcp_add",
+  "mcp_remove",
+  "mcp_enable",
+  "mcp_disable",
+  "mcp_tools",
+  "mcp_call",
+  "mcp_resources",
+  "mcp_read",
+  "mcp_prompts",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────
@@ -153,7 +166,7 @@ const TOOL_PATTERNS: RegExp[] = [
   // Security scan
   /\b(security scan|virus scan|malware scan|scan for)\b/i,
   // Export / save with format
-  /^(export|save|write)\s+(txt|md|json|csv|html|text|markdown)\b/i,
+  /^(export|save|write|chat_export)\s+(txt|md|json|csv|html|text|markdown)\b/i,
   // Screenshot / vision
   /what'?s?\s+on\s+(my\s+)?screen/i,
 ];

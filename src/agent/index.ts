@@ -27,6 +27,7 @@ import {
   buildRetrievedContextLayer,
   assembleSystemPrompt,
 } from "./promptAssembler.js";
+import { getMCPManager } from "../modules/mcp/manager.js";
 
 export { TokenBudgetTracker } from "./tokenBudgetTracker.js";
 
@@ -87,6 +88,12 @@ export class CakeAgent {
       else console.log(msg);
       await this.run(job.taskDescription);
     });
+
+    getMCPManager()
+      .init()
+      .catch((err) => {
+        if (onLog) onLog(`[mcp] init error: ${err.message}`);
+      });
 
     // Load user plugins asynchronously (non-blocking)
     loadAllPlugins(onLog)
@@ -174,7 +181,12 @@ export class CakeAgent {
       if (regexHandler) {
         const cached = this.responseCache.get(cacheKey);
         if (cached) return cached;
-        const result = await regexHandler(this.provider, trimmed, this.model, opts);
+        const result = await regexHandler(
+          this.provider,
+          trimmed,
+          this.model,
+          opts,
+        );
         const response = { text: result.text, usage: result.usage };
         this.maybeCacheToolResult(cacheKey, trimmed, response);
         this.rememberAsync(`User asked: ${trimmed}\nResult: ${result.text}`, {
@@ -228,7 +240,12 @@ export class CakeAgent {
     if (regexHandler) {
       const cached = this.responseCache.get(cacheKey);
       if (cached) return cached;
-      const result = await regexHandler(this.provider, trimmed, this.model, opts);
+      const result = await regexHandler(
+        this.provider,
+        trimmed,
+        this.model,
+        opts,
+      );
       const response = { text: result.text, usage: result.usage };
       this.maybeCacheToolResult(cacheKey, trimmed, response);
       if (result.text.length > 50) {
@@ -249,25 +266,37 @@ export class CakeAgent {
       }
 
       // After getting tool result:
-      const rawResult = await aiHandler(this.provider, trimmed, this.fastModel, opts);
+      const rawResult = await aiHandler(
+        this.provider,
+        trimmed,
+        this.fastModel,
+        opts,
+      );
       const compressed = compressToolOutput(intent, rawResult.text);
 
       // Store FULL output in vector memory
-      this.rememberAsync(compressed.fullOutput, { source: 'tool', tool: intent });
+      this.rememberAsync(compressed.fullOutput, {
+        source: "tool",
+        tool: intent,
+      });
 
       // Return compressed summary to conversation history
       const response = { text: rawResult.text, usage: rawResult.usage };
 
       // IMPORTANT: what goes into history should be the summary, not the full output
       // This requires separating "what we show user" from "what we add to history"
-      this.history.push('assistant', compressed.summary);
+      this.history.push("assistant", compressed.summary);
 
       if (rawResult.usage) {
-        this.budgetTracker.record(rawResult.usage.inputTokens + rawResult.usage.outputTokens);
+        this.budgetTracker.record(
+          rawResult.usage.inputTokens + rawResult.usage.outputTokens,
+        );
       }
 
       if (!UNCACHEABLE_INTENTS.has(intent))
         this.responseCache.set(cacheKey, response);
+
+      return response;
     }
 
     // ── 4) Fallback ───────────────────────────────────────────────────────────
@@ -330,11 +359,7 @@ export class CakeAgent {
 
     const result =
       opts.onChunk && this.provider.stream
-        ? await this.provider.stream(
-            messages,
-            chatOpts,
-            opts.onChunk,
-          )
+        ? await this.provider.stream(messages, chatOpts, opts.onChunk)
         : await this.provider.chat(messages, chatOpts);
 
     this.history.push("assistant", result.text);
@@ -344,7 +369,9 @@ export class CakeAgent {
     });
 
     if (result.usage) {
-      this.budgetTracker.record(result.usage.inputTokens + result.usage.outputTokens);
+      this.budgetTracker.record(
+        result.usage.inputTokens + result.usage.outputTokens,
+      );
     }
 
     return { text: result.text, usage: result.usage };

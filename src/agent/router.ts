@@ -357,6 +357,21 @@ export const ROUTES: Route[] = [
   },
   { patterns: [/^locker_clear\b/i], handler: H.handleLockerClear },
   { patterns: [/^locker_info\b/i], handler: H.handleLockerInfo },
+
+  // ── MCP ────────────────────────────────────────────────────────────────────
+  { patterns: [/^mcp_list\b/i, /^mcp list\b/i], handler: H.handleMcpList },
+  { patterns: [/^mcp_connect\b/i], handler: H.handleMcpConnect },
+  { patterns: [/^mcp_disconnect\b/i], handler: H.handleMcpDisconnect },
+  { patterns: [/^mcp_add\b/i], handler: H.handleMcpAdd },
+  { patterns: [/^mcp_remove\b/i], handler: H.handleMcpRemove },
+  { patterns: [/^mcp_enable\b/i], handler: H.handleMcpEnable },
+  { patterns: [/^mcp_disable\b/i], handler: H.handleMcpDisable },
+  { patterns: [/^mcp_tools\b/i], handler: H.handleMcpTools },
+  { patterns: [/^mcp_call\b/i], handler: H.handleMcpCall },
+  { patterns: [/^mcp_resources\b/i], handler: H.handleMcpResources },
+  { patterns: [/^mcp_read\b/i], handler: H.handleMcpRead },
+  { patterns: [/^mcp_prompts\b/i], handler: H.handleMcpPrompts },
+  { patterns: [/^mcp\b/i], handler: H.handleMcp },
 ];
 
 /**
