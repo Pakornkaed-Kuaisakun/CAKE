@@ -130,6 +130,8 @@ const TOOL_PREFIXES = new Set([
   "mcp_resources",
   "mcp_read",
   "mcp_prompts",
+  "deep_search",
+  "deep_research",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────

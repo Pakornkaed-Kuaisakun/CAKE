@@ -22,3 +22,4 @@ export * from "./vision.js";
 export * from "./vectordb.js";
 export * from "./locker.js";
 export * from "./mcp.js";
+export * from "./deepSearch.js";

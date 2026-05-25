@@ -85,6 +85,8 @@ const VALID_INTENTS = new Set([
   "mcp_resources",
   "mcp_read",
   "mcp_prompts",
+  "deep_search",
+  "deep_research",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -160,6 +162,8 @@ mcp_call          — call an MCP tool directly
 mcp_resources     — list available MCP resources
 mcp_read          — read an MCP resource by URI
 mcp_prompts       — list available MCP prompts
+deep_search       — comprehensive multi-step web research with synthesis (e.g. "deep search quantum computing")
+deep_research     — alias for deep_search
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -205,6 +209,9 @@ EXAMPLES (input → intent):
 "add mcp filesystem server" → mcp_add
 "call mcp tool read_file" → mcp_call
 "list mcp tools" → mcp_tools
+"deep search climate change solutions" → deep_search
+"research in depth AI regulation" → deep_search
+"deep research fusion energy" → deep_search
 
 `;
 

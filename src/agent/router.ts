@@ -372,6 +372,17 @@ export const ROUTES: Route[] = [
   { patterns: [/^mcp_read\b/i], handler: H.handleMcpRead },
   { patterns: [/^mcp_prompts\b/i], handler: H.handleMcpPrompts },
   { patterns: [/^mcp\b/i], handler: H.handleMcp },
+
+  // Deep search — before generic search so it takes priority
+  {
+    patterns: [
+      /^deep[_\s]search\s+/i,
+      /^deep[_\s]research\s+/i,
+      /^research\s+in[_\s]?depth\s+/i,
+      /^in[_\s]depth\s+research\s+/i,
+    ],
+    handler: H.handleDeepSearch,
+  },
 ];
 
 /**

@@ -397,4 +397,17 @@ export const COMMANDS: CommandSuggestion[] = [
       ["deny", "ask", "allow"],
     ],
   },
+  {
+    command: "deep search <topic>",
+    description:
+      "Multi-angle web research with AI synthesis into a full report",
+  },
+  {
+    command: "deep search <topic> --export",
+    description: "Research and auto-save report to reports/ folder",
+  },
+  {
+    command: "deep research <topic>",
+    description: "Alias for deep search",
+  },
 ];

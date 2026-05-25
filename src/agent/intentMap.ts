@@ -50,6 +50,8 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
 
   // ── Search ─────────────────────────────────────────────────────────────────
   search: H.handleSearch,
+  deep_search: H.handleDeepSearch,
+  deep_research: H.handleDeepSearch,
 
   // ── Cron ───────────────────────────────────────────────────────────────────
   cron_list: H.handleListCron,
