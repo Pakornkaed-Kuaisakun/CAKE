@@ -12,8 +12,11 @@ export function consumeEmbedWarning(): boolean {
 }
 
 export class MemoryManager extends TieredMemoryManager {
-  constructor(provider: import("../../providers/types.js").AIProvider) {
-    super(provider);
+  constructor(
+    provider: import("../../providers/types.js").AIProvider,
+    storageDir?: string,
+  ) {
+    super(provider, storageDir);
   }
 
   override async remember(

@@ -37,6 +37,20 @@ export class VectorStore {
     this.save();
   }
 
+  /** Return a shallow copy of all entries (for maintenance / reflection) */
+  listEntries(): MemoryEntry[] {
+    return [...this.entries];
+  }
+
+  /** Update an existing entry by id with partial data and persist */
+  updateEntry(id: string, data: Partial<MemoryEntry>) {
+    const idx = this.entries.findIndex((e) => e.id === id);
+    if (idx === -1) return false;
+    this.entries[idx] = { ...this.entries[idx], ...data, metadata: { ...this.entries[idx].metadata, ...(data.metadata ?? {}) } } as MemoryEntry;
+    this.save();
+    return true;
+  }
+
   search(queryEmbedding: number[], limit = 5): SearchResult[] {
     const results = this.entries.map((entry) => ({
       entry,

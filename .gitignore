@@ -14,5 +14,6 @@ dist
 .vscode
 /reports
 .idea
+.prompt
 
 ggml-base.en.bin

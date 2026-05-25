@@ -85,6 +85,14 @@ const VALID_INTENTS = new Set([
   "mcp_resources",
   "mcp_read",
   "mcp_prompts",
+  "async",
+  "background",
+  "async_list",
+  "background_list",
+  "async_status",
+  "background_status",
+  "async_cancel",
+  "background_cancel",
   "deep_search",
   "deep_research",
 ]);
@@ -162,6 +170,14 @@ mcp_call          — call an MCP tool directly
 mcp_resources     — list available MCP resources
 mcp_read          — read an MCP resource by URI
 mcp_prompts       — list available MCP prompts
+async             — queue a background task for later processing
+background        — alias for async
+async_list        — list queued background tasks
+background_list   — alias for async_list
+async_status      — show status for a background task
+background_status — alias for async_status
+async_cancel      — cancel a pending background task
+background_cancel — alias for async_cancel
 deep_search       — comprehensive multi-step web research with synthesis (e.g. "deep search quantum computing")
 deep_research     — alias for deep_search
 

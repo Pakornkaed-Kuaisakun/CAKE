@@ -37,7 +37,10 @@ function buildSystemPrompt(): string {
     8. Do NOT repeat a tool call with the exact same input twice.
     9. If a tool returned an error, try a different approach.
     10. Keep "input" concise but complete — it is passed directly to the tool.
-    11. Never truncate content mid-sentence. If content is long, include it all.`;
+    11. Never truncate content mid-sentence. If content is long, include it all.
+    12. If many tasks, you can use "async" to queue background tasks and continue with the next step without waiting for the result. (Use sparingly — only for tasks that are not needed for the next step of reasoning.)
+    13. Always use "search" or "deep_search" for current information lookups — do NOT rely on training data for recent or real-time information.
+    `;
 }
 
 export async function planNextStep(

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx src/cli/index.tsx",
     "build": "tsc -p tsconfig.json",
+    "test": "tsx test/**/*.test.ts",
     "start": "node dist/cli/index.js",
     "discord": "tsx src/discord/index.ts"
   },

@@ -114,6 +114,27 @@ export const AGENT_TOOLS: AgentTool[] = [
     example: "news AI",
   },
   {
+    name: "async",
+    description:
+      "Queue a background task to run asynchronously. Returns a task id. | async <task_description>",
+    example: "async Summarize today's news and save to reports/news.txt",
+  },
+  {
+    name: "async_list",
+    description: "List background tasks and their status. | async_list",
+    example: "async_list",
+  },
+  {
+    name: "async_status",
+    description: "Show status and recent output for a background task. | async_status <id>",
+    example: "async_status 3f8a9f...",
+  },
+  {
+    name: "async_cancel",
+    description: "Cancel a pending background task. | async_cancel <id>",
+    example: "async_cancel 3f8a9f...",
+  },
+  {
     name: "notify",
     description:
       "Send a desktop notification with a message. | notify <message>",
@@ -354,6 +375,14 @@ export function getToolRunner(toolName: string): ToolRunner | null {
       return wrap(H.handleMcpPrompts);
     case "finance":
       return wrap(H.handleFinanceReport);
+    case "async":
+      return wrap(H.handleAsync);
+    case "async_list":
+      return wrap(H.handleAsyncList);
+    case "async_status":
+      return wrap(H.handleAsyncStatus);
+    case "async_cancel":
+      return wrap(H.handleAsyncCancel);
     case "email":
       return wrap(H.handleEmail);
     case "email_send":

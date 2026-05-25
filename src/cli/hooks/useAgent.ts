@@ -296,6 +296,17 @@ export function useAgent() {
             return;
           }
 
+          case "hallucination": {
+            const { handleHallucinationCommand } =
+              await import("../../agent/handlers/hallucination.js");
+            const result = await handleHallucinationCommand(
+              createProvider(providerName),
+              args,
+            );
+            addMsg("system", result.text);
+            return;
+          }
+
           case "exit":
           case "quit":
             exit();

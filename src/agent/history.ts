@@ -1,5 +1,6 @@
 // src/agent/history.ts — redesigned
 
+import { EpisodeStore } from "../modules/memory/episodes.js";
 export interface HistoryMessage {
   role: 'user' | 'assistant' | 'system';
   /** What gets sent to the LLM (compressed for tool outputs) */
@@ -27,6 +28,17 @@ export class ConversationHistory {
 
     // If history is getting large, compress older entries
     this.maybeTrimHistory();
+
+    try {
+      const store = new EpisodeStore();
+      const active = store.getActiveEpisode();
+      if (active) {
+        store.appendMessage(active.id, { role, content, displayContent });
+      }
+    } catch (err) {
+      // non-fatal — do not interrupt agent execution
+      // console.warn(`[episodes] append failed: ${err?.message ?? err}`);
+    }
   }
 
   getAll(): import('../providers/types.js').Message[] {

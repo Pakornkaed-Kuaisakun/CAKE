@@ -2,6 +2,7 @@
 
 export class TokenBudgetTracker {
   private sessionTokens = 0;
+  private savedTokens = 0;
   private readonly hourlyLimit: number;
   private hourStart = Date.now();
 
@@ -20,6 +21,29 @@ export class TokenBudgetTracker {
 
   isNearLimit(): boolean {
     return this.sessionTokens > this.hourlyLimit * 0.9;
+  }
+
+  recordSavings(tokens: number): void {
+    this.savedTokens += Math.max(0, Math.floor(tokens));
+  }
+
+  getReport(): {
+    sessionTokens: number;
+    remainingTokens: number;
+    savedTokens: number;
+    hourlyLimit: number;
+  } {
+    return {
+      sessionTokens: this.sessionTokens,
+      remainingTokens: this.remainingTokens(),
+      savedTokens: this.savedTokens,
+      hourlyLimit: this.hourlyLimit,
+    };
+  }
+
+  reportSummary(): string {
+    const report = this.getReport();
+    return `Token usage ${report.sessionTokens}/${report.hourlyLimit}, remaining ${report.remainingTokens}, estimated savings ${report.savedTokens}.`;
   }
 
   remainingTokens(): number {

@@ -22,16 +22,14 @@ export function Header({ provider, model }: Props) {
       justifyContent='space-between'
     >
       <Text bold color={theme.secondary}>
-        ⚡ {APP_NAME} v{APP_VERSION}
+        {APP_NAME} v{APP_VERSION}
       </Text>
       <Text color={theme.muted}>
         {" "}
         [{provider}
         {model ? ` (${model} / ${getFastModel(provider)})` : ""}]{" "}
       </Text>
-      <Text color={theme.muted} dimColor>
-        /help for commands
-      </Text>
+      <Text color={theme.muted}>/help for commands</Text>
     </Box>
   );
 }

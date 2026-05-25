@@ -17,6 +17,7 @@ export * from "./security.js";
 export * from "./chat.js";
 export * from "./bash.js";
 export * from "./autonomous.js";
+export * from "./async.js";
 export * from "./plugins.js";
 export * from "./vision.js";
 export * from "./vectordb.js";

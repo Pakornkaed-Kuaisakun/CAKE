@@ -19,6 +19,8 @@ import {
   readTodoHints,
   readCronHints,
   readCalendarHints,
+  readAsyncHints,
+  readAsyncPendingHints,
   type ItemHint,
 } from "../hints/itemHintReaders.js";
 
@@ -27,6 +29,8 @@ export type RemoveCommand =
   | "todo_remove"
   | "cron_remove"
   | "calendar_remove"
+  | "async_status"
+  | "async_cancel"
   | "";
 
 function read(cmd: RemoveCommand): ItemHint[] {
@@ -37,6 +41,10 @@ function read(cmd: RemoveCommand): ItemHint[] {
       return readCronHints();
     case "calendar_remove":
       return readCalendarHints();
+    case "async_status":
+      return readAsyncHints();
+    case "async_cancel":
+      return readAsyncPendingHints();
     default:
       return [];
   }

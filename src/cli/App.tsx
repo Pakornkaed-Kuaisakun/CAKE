@@ -1,5 +1,11 @@
 // src/cli/App.tsx
-import React, { useEffect } from "react";
+//
+// Claude Code-style layout:
+//   - Full welcome card on first load (two-column with pixel art cake + tips)
+//   - Collapses to compact header bar once user starts chatting
+//   - Warm orange/tomato accent palette on dark background
+
+import React, { useEffect, useState } from "react";
 import { Box, Text, useInput } from "ink";
 import Spinner from "ink-spinner";
 import { Header } from "./components/Header.js";
@@ -38,12 +44,16 @@ export function App() {
     commandHistory,
   } = useAgent();
 
-  // BUG FIX: useVoice's speakText and makeSpeakingOnChunk signatures changed.
-  // The hook no longer accepts an `onResponseEnd` callback in makeSpeakingOnChunk
-  // (that was an unused parameter in the original signature).
-  // speakText now requires a `wasStreamed` boolean argument.
-  // App.tsx wires the voice hook to useAgent via registerVoice — the actual
-  // calls happen inside useAgent.ts, so App.tsx only needs to handle F2 and UI.
+  // Collapse welcome card once user has sent at least one message
+  const [compactHeader, setCompactHeader] = useState(false);
+
+  useEffect(() => {
+    const userMessages = messages.filter((m) => m.role === "user");
+    if (userMessages.length > 0 && !compactHeader) {
+      setCompactHeader(true);
+    }
+  }, [messages]);
+
   const voice = useVoice(handleSubmit);
   const {
     voiceEnabled,
@@ -60,9 +70,7 @@ export function App() {
   }, [voice, registerVoice]);
 
   useInput((input, key) => {
-    if (handleVoiceKey(input, key)) return; // F2 consumed
-
-    // Stop speaking on any regular key press
+    if (handleVoiceKey(input, key)) return;
     if (isSpeaking && !key.ctrl) {
       stopSpeaking();
     }
@@ -70,12 +78,26 @@ export function App() {
 
   const hasUsage = stats.totalInputTokens > 0 || stats.totalOutputTokens > 0;
 
+  // Recent activity: last few assistant messages summaries
+  const recentActivity = messages
+    .filter((m) => m.role === "assistant")
+    .slice(-3)
+    .map((m) => `▶ ${m.content.slice(0, 55).replace(/\n/g, " ")}…`);
+
   return (
     <Box flexDirection='column'>
-      <Header provider={providerName} model={model} />
+      {/* Welcome card or compact bar */}
+      <Header
+        provider={providerName}
+        model={model}
+        // compact={compactHeader}
+        // recentActivity={recentActivity}
+      />
 
+      {/* Message history */}
       <MessageList messages={messages} version={msgVersion} />
 
+      {/* Locker flow prompt */}
       {locker.lockerState.step !== "idle" && (
         <LockerBar
           step={locker.lockerState.step}
@@ -83,6 +105,7 @@ export function App() {
         />
       )}
 
+      {/* Voice status bar */}
       {voiceEnabled && (
         <VoiceBar
           isRecording={isRecording}
@@ -91,19 +114,20 @@ export function App() {
         />
       )}
 
-      {/* ── Thinking indicator ── */}
+      {/* Thinking indicator */}
       {loading && (
         <Box marginBottom={1} gap={1}>
-          <Text color='cyan'>
+          <Text color='#e85d4a'>
             <Spinner type='dots' />
           </Text>
-          <Text color='cyan'>Thinking…</Text>
+          <Text color='#e85d4a'>Thinking…</Text>
           {thinkingMs !== null && (
             <Text color='gray'>{formatMs(thinkingMs)}</Text>
           )}
         </Box>
       )}
 
+      {/* Input bar */}
       <InputBar
         value={input}
         onChange={setInput}
@@ -118,14 +142,14 @@ export function App() {
         commandHistory={commandHistory}
       />
 
-      {/* ── Session token/cost footer ── */}
+      {/* Token / cost footer */}
       {hasUsage && (
         <Box marginTop={1} gap={2}>
           <Text color='gray'>
             Tokens: {stats.totalInputTokens}↑ {stats.totalOutputTokens}↓
           </Text>
           {stats.totalCachedTokens > 0 && (
-            <Text color='green'>
+            <Text color='#4caf50'>
               ⚡ cached: {stats.totalCachedTokens.toLocaleString()} (
               {(
                 (stats.totalCachedTokens / stats.totalInputTokens) *

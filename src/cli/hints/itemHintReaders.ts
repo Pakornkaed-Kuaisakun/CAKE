@@ -114,3 +114,36 @@ export function readCalendarHints(): ItemHint[] {
     return [];
   }
 }
+
+// ── Async queue hints ───────────────────────────────────────────────────────
+// Reads live background task IDs from the agent's asyncExecutionQueue.
+// Returns all tasks (pending/running/completed) but previews include status.
+import { asyncExecutionQueue } from "../../agent/asyncExecution.js";
+
+export function readAsyncHints(): ItemHint[] {
+  try {
+    const tasks = asyncExecutionQueue.list();
+    return tasks
+      .map((t) => ({
+        id: String(t.id ?? ""),
+        preview: `${t.status}${t.description ? ` • ${String(t.description).slice(0,60)}` : ""}`,
+      }))
+      .filter((h) => h.id);
+  } catch {
+    return [];
+  }
+}
+
+export function readAsyncPendingHints(): ItemHint[] {
+  try {
+    const tasks = asyncExecutionQueue.list().filter((t) => t.status === "pending");
+    return tasks
+      .map((t) => ({
+        id: String(t.id ?? ""),
+        preview: `${t.status}${t.description ? ` • ${String(t.description).slice(0,60)}` : ""}`,
+      }))
+      .filter((h) => h.id);
+  } catch {
+    return [];
+  }
+}

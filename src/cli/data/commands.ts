@@ -4,6 +4,45 @@ export interface CommandSuggestion {
   parameters?: (string | string[])[];
 }
 
+export const HALLUCINATION_COMMANDS: CommandSuggestion[] = [
+  {
+    command: "/hallucination",
+    description: "Show hallucination detection stats overview",
+  },
+  {
+    command: "/hallucination stats",
+    description: "Show full hallucination stats",
+  },
+  {
+    command: "/hallucination recent [N]",
+    description: "Show last N flagged responses (default 5)",
+  },
+  {
+    command: "/hallucination on",
+    description: "Enable hallucination detection (default)",
+  },
+  {
+    command: "/hallucination off",
+    description: "Disable hallucination detection for this session",
+  },
+  {
+    command: "/hallucination verbose",
+    description: "Toggle inline claim annotation on critical responses",
+  },
+  {
+    command: "/hallucination threshold <0.0-1.0>",
+    description: "Set detection threshold (0.4 = default, 1.0 = disabled)",
+  },
+  {
+    command: "/hallucination clear",
+    description: "Clear the hallucination event log",
+  },
+  {
+    command: "/hallucination info",
+    description: "Show hallucination prevention configuration",
+  },
+];
+
 export const COMMANDS: CommandSuggestion[] = [
   // ── Core commands ───────────────────────────────────────────────────────────
   {
@@ -38,6 +77,19 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "cron_list", description: "List all scheduled tasks" },
   { command: "cron_schedule <task>", description: "Schedule a new task" },
   { command: "cron_remove <id>", description: "Remove a scheduled task" },
+  {
+    command: "async <task>",
+    description: "Run a task asynchronously in the background",
+  },
+  { command: "async_list", description: "List queued asynchronous tasks" },
+  {
+    command: "async_status <id>",
+    description: "Show the status of a queued async task",
+  },
+  {
+    command: "async_cancel <id>",
+    description: "Cancel a pending background task",
+  },
   {
     command: "finance <stock_tickers>",
     description: "Get stock analysis report PDF",
@@ -398,16 +450,13 @@ export const COMMANDS: CommandSuggestion[] = [
     ],
   },
   {
-    command: "deep search <topic>",
+    command: "deep_search <topic>",
     description:
       "Multi-angle web research with AI synthesis into a full report",
   },
   {
-    command: "deep search <topic> --export",
+    command: "deep_search <topic> --export",
     description: "Research and auto-save report to reports/ folder",
   },
-  {
-    command: "deep research <topic>",
-    description: "Alias for deep search",
-  },
+  ...HALLUCINATION_COMMANDS,
 ];

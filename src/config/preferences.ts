@@ -1,7 +1,4 @@
 // src/config/preferences.ts
-// Persistent user preferences stored in ~/.cake/prefs.json
-// Survives restarts — loaded at startup, updated on /default or /provider --save.
-
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -15,13 +12,13 @@ export interface Preferences {
 const PREFS_DIR = path.join(os.homedir(), ".cake");
 const PREFS_FILE = path.join(PREFS_DIR, "prefs.json");
 
+// "cake" is the new default — matches the Claude Code-inspired warm dark theme
 const DEFAULTS: Preferences = {
   provider: "claude",
   model: null,
-  theme: "dark",
+  theme: "cake",
 };
 
-/** Load preferences from disk. Returns defaults if file doesn't exist. */
 export function loadPrefs(): Preferences {
   try {
     if (!fs.existsSync(PREFS_FILE)) return { ...DEFAULTS };
@@ -37,7 +34,6 @@ export function loadPrefs(): Preferences {
   }
 }
 
-/** Save preferences to ~/.cake/prefs.json */
 export function savePrefs(prefs: Partial<Preferences>): void {
   const current = loadPrefs();
   const next: Preferences = {
@@ -51,7 +47,6 @@ export function savePrefs(prefs: Partial<Preferences>): void {
   fs.writeFileSync(PREFS_FILE, JSON.stringify(next, null, 2), "utf-8");
 }
 
-/** Return the path of the prefs file (for display in messages). */
 export function prefsFilePath(): string {
   return PREFS_FILE;
 }

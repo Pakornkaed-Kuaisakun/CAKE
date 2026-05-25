@@ -47,6 +47,18 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
   document_summarize: H.handleSummarizeDocument,
   document_ask: H.handleAskDocument,
   memory_index: H.handleIndexDocument,
+  memory_search: H.handleMemorySearch,
+  session_search: H.handleSessionSearch,
+  // Episodic memory
+  episode_start: H.handleEpisodeStart,
+  episode_end: H.handleEpisodeEnd,
+  episode_list: H.handleEpisodeList,
+  episode_summary: H.handleEpisodeSummary,
+  // Self-reflection / memory refinement
+  self_reflect: H.handleSelfReflect,
+  // Decision history
+  decision_record: H.handleDecisionRecord,
+  decision_list: H.handleDecisionList,
 
   // ── Search ─────────────────────────────────────────────────────────────────
   search: H.handleSearch,
@@ -79,6 +91,16 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
 
   // ── Autonomous Agent ───────────────────────────────────────────────────────
   autonomous: H.handleAutonomous,
+
+  // ── Background / async execution
+  async: H.handleAsync,
+  background: H.handleAsync,
+  async_list: H.handleAsyncList,
+  background_list: H.handleAsyncList,
+  async_status: H.handleAsyncStatus,
+  background_status: H.handleAsyncStatus,
+  async_cancel: H.handleAsyncCancel,
+  background_cancel: H.handleAsyncCancel,
 
   // ── Plugins ────────────────────────────────────────────────────────────────
   plugins: H.handlePlugins,
