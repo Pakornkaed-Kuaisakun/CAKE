@@ -5,7 +5,7 @@ import type {
   StreamChunkCallback,
 } from "../providers/types.js";
 import { ConversationHistory } from "./history.js";
-import { EpisodeStore } from "../modules/memory/episodes.js";
+import { EpisodeStore, DecisionStore } from "../modules/memory/episodes.js";
 import { MemoryManager } from "../modules/memory/index.js";
 import { matchRoute, isChatFastPath } from "./router.js";
 import { aiIntentRouter } from "./AiRouter.js";
@@ -46,10 +46,21 @@ export interface AgentResponse {
   usage?: TokenUsage;
 }
 
+export interface TaskStep {
+  /** Current execution phase */
+  phase: "routing" | "tool" | "chat" | "pipeline" | "done" | "error";
+  /** Human-readable label shown in the spinner */
+  label: string;
+  /** The resolved tool / intent name, if applicable */
+  tool?: string;
+}
+
 export interface RunOptions {
   signal?: AbortSignal;
   /** Called with each text chunk as it arrives. Enables streaming for chat. */
   onChunk?: StreamChunkCallback;
+  /** Called at each meaningful phase change so the UI can show live progress. */
+  onStep?: (step: TaskStep) => void;
 }
 
 const UNCACHEABLE_INTENTS = new Set([
@@ -144,11 +155,7 @@ export class CakeAgent {
 
     if (cronManager.listJobs().length === 0) {
       cronManager
-        .addJob(
-          "Daily memory reflection",
-          "0 5 * * *",
-          "self_reflect 25",
-        )
+        .addJob("Daily memory reflection", "0 5 * * *", "self_reflect 25")
         .catch((err) => {
           const msg = `[CRON] Failed to register built-in reflection job: ${err.message}`;
           if (onLog) onLog(msg);
@@ -195,7 +202,11 @@ export class CakeAgent {
   }
 
   shouldRetrieveMemory(inputLength: number): boolean {
-    return inputLength > 30 && !!this.provider.embed && !this.budgetTracker.isNearLimit();
+    return (
+      inputLength > 30 &&
+      !!this.provider.embed &&
+      !this.budgetTracker.isNearLimit()
+    );
   }
 
   getTokenBudgetReport(): string {
@@ -257,12 +268,15 @@ export class CakeAgent {
         : (signalOrOpts ?? {});
 
     const trimmed = input.trim();
+    const emit = (step: TaskStep) => opts.onStep?.(step);
 
     const asyncRequest = trimmed.match(/^(?:async|background)\s+(.+)$/i);
     if (asyncRequest) {
       const description = asyncRequest[1].trim();
       if (!description) {
-        return { text: "Please provide a task to run in the background. Usage: async <task>" };
+        return {
+          text: "Please provide a task to run in the background. Usage: async <task>",
+        };
       }
       const taskId = this.enqueueBackgroundTask(description);
       return {
@@ -274,18 +288,24 @@ export class CakeAgent {
       return { text: this.formatAsyncTaskList() };
     }
 
-    const asyncStatus = trimmed.match(/^(?:async_status|background_status)\s+(\S+)$/i);
+    const asyncStatus = trimmed.match(
+      /^(?:async_status|background_status)\s+(\S+)$/i,
+    );
     if (asyncStatus) {
       return { text: this.formatAsyncTaskStatus(asyncStatus[1]) };
     }
 
-    const asyncCancel = trimmed.match(/^(?:async_cancel|background_cancel)\s+(\S+)$/i);
+    const asyncCancel = trimmed.match(
+      /^(?:async_cancel|background_cancel)\s+(\S+)$/i,
+    );
     if (asyncCancel) {
       return { text: this.formatAsyncTaskCancel(asyncCancel[1]) };
     }
     // Automatic episode lifecycle detection (start / end)
     try {
-      const startMatch = trimmed.match(/^(?:start|begin)\s+(?:episode|meeting|session)\s+(.+)/i);
+      const startMatch = trimmed.match(
+        /^(?:start|begin)\s+(?:episode|meeting|session)\s+(.+)/i,
+      );
       if (startMatch) {
         const title = startMatch[1].trim();
         const store = new EpisodeStore();
@@ -293,7 +313,9 @@ export class CakeAgent {
         return { text: `Started episode '${title}' (id: ${ep.id}).` };
       }
 
-      const endMatch = trimmed.match(/^(?:end|stop|finish)\s+(?:episode|meeting|session)(?:\s+([\w-]+))?/i);
+      const endMatch = trimmed.match(
+        /^(?:end|stop|finish)\s+(?:episode|meeting|session)(?:\s+([\w-]+))?/i,
+      );
       if (endMatch) {
         const maybeId = endMatch[1];
         const store = new EpisodeStore();
@@ -313,12 +335,14 @@ export class CakeAgent {
 
     // ── 0) Pipeline ───────────────────────────────────────────────────────────
     if (hasPipe(trimmed)) {
+      emit({ phase: "pipeline", label: "Running pipeline..." });
       const steps = parsePipeline(trimmed);
       const pipeResult = await executePipeline(
         steps,
         this.provider,
         this.model,
       );
+      emit({ phase: "done", label: "Done" });
       const header = pipeResult.steps.length
         ? `[PIPELINE] ${pipeResult.steps.join(" → ")}\n\n`
         : "";
@@ -329,6 +353,7 @@ export class CakeAgent {
     if (isChatFastPath(trimmed)) return this.runChat(trimmed, opts);
 
     // ── 2) Zero-latency pre-classifier ────────────────────────────────────────
+    emit({ phase: "routing", label: "Routing intent..." });
     const preClass = preClassify(trimmed);
 
     if (preClass === "chat") return this.runChat(trimmed, opts);
@@ -338,12 +363,14 @@ export class CakeAgent {
       if (regexHandler) {
         const cached = this.responseCache.get(cacheKey);
         if (cached) return cached;
+        emit({ phase: "tool", label: "Running tool...", tool: "regex" });
         const result = await regexHandler(
           this.provider,
           trimmed,
           this.model,
           opts,
         );
+        emit({ phase: "done", label: "Done" });
         const finalText = this.runHallucinationCheck(
           trimmed,
           result.text,
@@ -370,12 +397,18 @@ export class CakeAgent {
             const cached = this.responseCache.get(cacheKey);
             if (cached) return cached;
           }
+          emit({
+            phase: "tool",
+            label: `Running ${candidate}...`,
+            tool: candidate,
+          });
           const result = await directHandler(
             this.provider,
             trimmed,
             this.model,
             opts,
           );
+          emit({ phase: "done", label: "Done" });
           const finalText = this.runHallucinationCheck(
             trimmed,
             result.text,
@@ -398,12 +431,18 @@ export class CakeAgent {
     if (regexHandler) {
       const cached = this.responseCache.get(cacheKey);
       if (cached) return cached;
+      emit({
+        phase: "tool",
+        label: "Running tool...",
+        tool: "regex",
+      });
       const result = await regexHandler(
         this.provider,
         trimmed,
         this.model,
         opts,
       );
+      emit({ phase: "done", label: "Done" });
       const finalText = this.runHallucinationCheck(
         trimmed,
         result.text,
@@ -419,6 +458,8 @@ export class CakeAgent {
       return response;
     }
 
+    emit({ phase: "routing", label: "Classifying with AI..." });
+
     const intent = await aiIntentRouter(this.provider, trimmed, this.fastModel);
     const aiHandler = intentMap[intent];
 
@@ -427,6 +468,11 @@ export class CakeAgent {
         const cached = this.responseCache.get(cacheKey);
         if (cached) return cached;
       }
+      emit({
+        phase: "tool",
+        label: `Running: ${intent}`,
+        tool: intent,
+      });
 
       const rawResult = await aiHandler(
         this.provider,
@@ -434,6 +480,7 @@ export class CakeAgent {
         this.fastModel,
         opts,
       );
+      emit({ phase: "done", label: "Done" });
       const compressed = compressToolOutput(intent, rawResult.text);
 
       // Run hallucination check on full output (not compressed)
@@ -480,14 +527,18 @@ export class CakeAgent {
       if (!this.budgetTracker.isNearLimit()) {
         memories = await Promise.race([
           this.memory.retrieve(input),
-          new Promise<string[]>((resolve) => setTimeout(() => resolve([]), 600)),
+          new Promise<string[]>((resolve) =>
+            setTimeout(() => resolve([]), 600),
+          ),
         ]);
 
         const actualChars = memories
           .slice(0, 2)
           .reduce((sum, m) => sum + Math.min(100, m.length), 0);
         const actualTokens = Math.ceil(actualChars / 4);
-        this.budgetTracker.recordSavings(retrievalBaselineTokens - actualTokens);
+        this.budgetTracker.recordSavings(
+          retrievalBaselineTokens - actualTokens,
+        );
       } else {
         this.budgetTracker.recordSavings(retrievalBaselineTokens);
       }
@@ -536,6 +587,8 @@ export class CakeAgent {
       messages[messages.length - 1].content = enrichedContent;
     }
 
+    opts.onStep?.({ phase: "chat", label: "Generating response..." });
+
     const result =
       opts.onChunk && this.provider.stream
         ? await this.provider.stream(messages, chatOpts, opts.onChunk)
@@ -548,6 +601,11 @@ export class CakeAgent {
     this.awareness.observe(input, result.text);
     this.rememberAsync(`User: ${input}\nAssistant: ${result.text}`, {
       source: "conversation",
+    });
+    this.detectAndRecordDecisionsAsync(input, result.text).catch((err) => {
+      if (process.env.DEBUG) {
+        console.warn("[memory] decision detection failed:", err.message);
+      }
     });
 
     if (result.usage) {
@@ -593,8 +651,8 @@ export class CakeAgent {
           task.status === "completed"
             ? ` result=${this.shorten(task.result ?? "(empty)", 120)}`
             : task.status === "failed"
-            ? ` error=${this.shorten(task.error ?? "unknown", 120)}`
-            : "";
+              ? ` error=${this.shorten(task.error ?? "unknown", 120)}`
+              : "";
         return `${task.id} | ${task.status} | ${task.description}${note}`;
       })
       .join("\n");
@@ -609,8 +667,10 @@ export class CakeAgent {
       `Status: ${task.status}`,
       `Created: ${new Date(task.createdAt).toISOString()}`,
     ];
-    if (task.startedAt) details.push(`Started: ${new Date(task.startedAt).toISOString()}`);
-    if (task.completedAt) details.push(`Completed: ${new Date(task.completedAt).toISOString()}`);
+    if (task.startedAt)
+      details.push(`Started: ${new Date(task.startedAt).toISOString()}`);
+    if (task.completedAt)
+      details.push(`Completed: ${new Date(task.completedAt).toISOString()}`);
     if (task.result) details.push(`Result: ${this.shorten(task.result, 200)}`);
     if (task.error) details.push(`Error: ${this.shorten(task.error, 200)}`);
     return details.join("\n");
@@ -666,5 +726,90 @@ export class CakeAgent {
       if (process.env.DEBUG)
         console.warn("[memory] write failed:", err.message);
     });
+  }
+
+  private async detectAndRecordDecisionsAsync(
+    input: string,
+    responseText: string,
+  ): Promise<void> {
+    if (!this.provider.chat) return;
+
+    // Fast heuristic keyword match to minimize API calls
+    const keywords = [
+      "decided",
+      "agreed",
+      "resolution",
+      "action item",
+      "ตกลง",
+      "ตัดสินใจ",
+      "ข้อตกลง",
+      "อนุมัติ",
+      "agree",
+      "choose",
+      "selected",
+      "เลือก",
+      "เคาะ",
+    ];
+    const combined = (input + " " + responseText).toLowerCase();
+    const hasKeyword = keywords.some((kw) => combined.includes(kw));
+    if (!hasKeyword) return;
+
+    // Use LLM to extract decisions/agreements
+    const systemPrompt = `You are a precision decision-extraction system. Your job is to analyze the conversation turn and detect if a firm decision, agreement, or action item was finalized.
+If a decision or agreement was finalized, reply with a JSON object ONLY:
+{
+  "hasDecision": true,
+  "decision": "Brief, clear statement of the decision made",
+  "rationale": "Optional brief explanation of why/how this decision was reached (or null if none)"
+}
+If no firm decision, agreement, or action item was finalized, reply ONLY with:
+{
+  "hasDecision": false
+}
+Do NOT include markdown wrapping (like \`\`\`json), just raw JSON. Be conservative: only record actual agreements/resolutions.`;
+
+    const userMessage = `User: ${input}\nAssistant: ${responseText}`;
+    try {
+      const resp = await this.provider.chat(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
+        ],
+        { model: this.fastModel || this.model }
+      );
+      
+      if (!resp || !resp.text) return;
+      const trimmed = resp.text.trim();
+      const cleanJson = trimmed.replace(/^```json\s*|```$/g, "").trim();
+      const parsed = JSON.parse(cleanJson);
+
+      if (parsed.hasDecision && parsed.decision) {
+        const store = new DecisionStore();
+        const activeEpisode = new EpisodeStore().getActiveEpisode();
+        
+        let linkedMemoryIds: string[] = [];
+        try {
+          const entries = await this.memory.retrieveEntries(parsed.decision, 5);
+          linkedMemoryIds = entries.map((e) => e.id);
+        } catch {
+          // ignore linking errors
+        }
+
+        store.addDecision(
+          parsed.decision,
+          parsed.rationale || undefined,
+          activeEpisode?.id,
+          {
+            recordedBy: "auto",
+            linkedMemoryIds,
+            timestamp: Date.now(),
+          }
+        );
+      }
+    } catch (err: any) {
+      if (process.env.DEBUG) {
+        console.warn("[memory] detectAndRecordDecisionsAsync failed:", err.message);
+      }
+    }
   }
 }

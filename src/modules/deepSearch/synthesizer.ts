@@ -9,10 +9,11 @@ import type { SubQuery, SearchHit } from "./types.js";
 
 function buildContext(hits: SearchHit[]): string {
   return hits
-    .map(
-      (h, i) =>
-        `[${i + 1}] ${h.title} (${h.source})\nURL: ${h.url}\n${h.snippet}`,
-    )
+    .map((h, i) => {
+      const trust = `type=${h.sourceType ?? "unknown"} relevance=${(h.relevance ?? 0).toFixed(2)} hallucinationRisk=${(h.hallucinationRisk ?? 0).toFixed(2)}`;
+      const fetchedAt = h.metadata?.fetchedAt ?? "unknown";
+      return `[${i + 1}] ${h.title} (${h.source})\nURL: ${h.url}\n${h.snippet}\nSourceTrust: ${trust} fetchedAt=${fetchedAt}`;
+    })
     .join("\n\n");
 }
 

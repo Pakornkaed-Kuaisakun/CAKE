@@ -34,6 +34,7 @@ export function App() {
     setInput,
     loading,
     thinkingMs,
+    taskStep,
     providerName,
     model,
     handleSubmit,
@@ -114,16 +115,36 @@ export function App() {
         />
       )}
 
-      {/* Thinking indicator */}
+      {/* Thinking indicator — live task monitor */}
       {loading && (
-        <Box marginBottom={1} gap={1}>
-          <Text color='#e85d4a'>
-            <Spinner type='dots' />
-          </Text>
-          <Text color='#e85d4a'>Thinking…</Text>
-          {thinkingMs !== null && (
-            <Text color='gray'>{formatMs(thinkingMs)}</Text>
-          )}
+        <Box marginBottom={1} flexDirection='column' gap={0}>
+          <Box gap={1}>
+            <Text
+              color={
+                taskStep?.phase === "tool"
+                  ? "#00bcd4"
+                  : taskStep?.phase === "pipeline"
+                    ? "#ce93d8"
+                    : "#e85d4a"
+              }
+            >
+              <Spinner type='dots' />
+            </Text>
+            <Text
+              color={
+                taskStep?.phase === "tool"
+                  ? "#00bcd4"
+                  : taskStep?.phase === "pipeline"
+                    ? "#ce93d8"
+                    : "#e85d4a"
+              }
+            >
+              {taskStep ? taskStep.label : "Thinking…"}
+            </Text>
+            {thinkingMs !== null && (
+              <Text color='gray'>{formatMs(thinkingMs)}</Text>
+            )}
+          </Box>
         </Box>
       )}
 

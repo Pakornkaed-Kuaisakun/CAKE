@@ -3,7 +3,7 @@ import { useApp } from "ink";
 import { createProvider } from "../../providers/index.js";
 import type { ProviderName, TokenUsage } from "../../providers/types.js";
 import { CakeAgent } from "../../agent/index.js";
-import type { RunOptions } from "../../agent/index.js";
+import type { RunOptions, TaskStep } from "../../agent/index.js";
 import fs from "fs";
 import {
   runAuthFlow,
@@ -107,6 +107,7 @@ export function useAgent() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [thinkingMs, setThinkingMs] = useState<number | null>(null);
+  const [taskStep, setTaskStep] = useState<TaskStep | null>(null);
 
   const voiceRef = useRef<UseVoiceReturn | null>(null);
   const registerVoice = useCallback((v: UseVoiceReturn) => {
@@ -598,6 +599,7 @@ export function useAgent() {
             try {
               const resp = await agent.run(`auto ${goal}`, {
                 signal: controller.signal,
+                onStep: setTaskStep,
               });
               const finalTime = Date.now() - t0;
               stopTimer();
@@ -620,6 +622,7 @@ export function useAgent() {
             } finally {
               setLoading(false);
               setThinkingMs(null);
+              setTaskStep(null);
               abortControllerRef.current = null;
               streamingIdRef.current = null;
             }
@@ -781,6 +784,7 @@ export function useAgent() {
         const runOpts: RunOptions = {
           signal: controller.signal,
           onChunk,
+          onStep: setTaskStep,
         };
 
         const resp = await agent.run(trimmed, runOpts);
@@ -846,6 +850,7 @@ export function useAgent() {
       } finally {
         setLoading(false);
         setThinkingMs(null);
+        setTaskStep(null);
         abortControllerRef.current = null;
         streamingIdRef.current = null;
       }
@@ -875,6 +880,7 @@ export function useAgent() {
     setInput,
     loading,
     thinkingMs,
+    taskStep,
     providerName,
     model,
     handleSubmit,

@@ -18,6 +18,7 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { text } from "../utils/text.js";
 import { deepSearch } from "../../modules/deepSearch/index.js";
+import { getDeepSearchRun, listDeepSearchRuns } from "../../modules/deepSearch/monitor.js";
 import type { RunOptions } from "../index.js";
 
 /** Strip the intent verb prefix from the input */
@@ -105,8 +106,9 @@ export async function handleDeepSearch(
     ? `\n\n📄 Report saved to: ${result.exportPath}`
     : "";
 
+  const finalHeader = `[DEEP SEARCH] ${topic}\nRun ID: ${result.runId}\n${SEPARATOR}`;
   const body = [
-    header,
+    finalHeader,
     ...progressLines,
     "",
     SEPARATOR,
@@ -127,4 +129,53 @@ export async function handleDeepSearch(
   }
 
   return text(body);
+}
+
+export async function handleDeepSearchList(
+  _provider: AIProvider,
+  _input: string,
+): Promise<ChatResult> {
+  const runs = listDeepSearchRuns();
+  if (runs.length === 0) return text("No active deep search runs.");
+
+  const lines = runs.map((run) => {
+    const age = run.startedAt ? `started ${new Date(run.startedAt).toISOString()}` : "not started";
+    return `${run.id} | ${run.status} | ${run.topic} | ${run.currentPhase} | ${run.progressPct}% | ${age}`;
+  });
+
+  return text(lines.join("\n"));
+}
+
+export async function handleDeepSearchStatus(
+  _provider: AIProvider,
+  input: string,
+): Promise<ChatResult> {
+  const match = input.match(/^(?:deep[_\s]?search[_\s]?status|deep search status)\s+(\S+)$/i);
+  if (!match) return text("Usage: deep_search_status <runId> or deep search status <runId>");
+
+  const runId = match[1];
+  const run = getDeepSearchRun(runId);
+  if (!run) return text(`Deep search run not found: ${runId}`);
+
+  const lines = [
+    `Run ID: ${run.id}`,
+    `Topic: ${run.topic}`,
+    `Status: ${run.status}`,
+    `Phase: ${run.currentPhase}`,
+    `Progress: ${run.progressPct}%`,
+    `Created: ${run.createdAt}`,
+    run.startedAt ? `Started: ${run.startedAt}` : null,
+    run.completedAt ? `Completed: ${run.completedAt}` : null,
+    run.error ? `Error: ${run.error}` : null,
+    "",
+    "Timeline:",
+    ...run.timeline.map((entry) =>
+      `  [${entry.status}] ${entry.phase} - ${entry.name} ${entry.progressPct ? `(${entry.progressPct}%)` : ""}` +
+      `${entry.startedAt ? ` started=${entry.startedAt}` : ""}` +
+      `${entry.completedAt ? ` completed=${entry.completedAt}` : ""}` +
+      `${entry.details ? ` details=${entry.details}` : ""}`,
+    ),
+  ].filter(Boolean) as string[];
+
+  return text(lines.join("\n"));
 }

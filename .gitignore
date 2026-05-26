@@ -8,6 +8,9 @@ node_modules
 # Logs
 *.log
 
+# Test
+/test
+
 # TS
 *.tsbuildinfo
 dist
@@ -15,5 +18,6 @@ dist
 /reports
 .idea
 .prompt
+.cache
 
 ggml-base.en.bin

@@ -428,6 +428,22 @@ export class OpenRouterProvider implements AIProvider, BatchProvider {
     );
   }
 
+  // ── Embeddings ────────────────────────────────────────────────────────────
+
+  async embed(
+    text: string,
+    model = "nvidia/llama-nemotron-embed-vl-1b-v2:free",
+  ): Promise<number[]> {
+    const response = await this.client.embeddings.create({
+      model,
+      input: text,
+    });
+    if (!response.data?.[0]?.embedding) {
+      throw new Error(`OpenRouter embedding failed for model ${model}`);
+    }
+    return response.data[0].embedding;
+  }
+
   // ── Batch API (client-side concurrent runner) ─────────────────────────────
 
   /**

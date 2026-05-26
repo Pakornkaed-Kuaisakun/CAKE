@@ -15,6 +15,7 @@
     "@google/generative-ai": "^0.24.1",
     "@types/pdfkit": "^0.17.6",
     "axios": "^1.16.0",
+    "chai": "^6.2.2",
     "chalk": "^5.6.2",
     "chokidar": "^5.0.0",
     "cli-highlight": "^2.1.11",
@@ -50,10 +51,12 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/chai": "^5.2.3",
     "@types/imap": "^0.8.43",
+    "@types/jest": "^30.0.0",
     "@types/mailparser": "^3.4.6",
     "@types/marked-terminal": "^6.1.1",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.9.1",
     "@types/node-cron": "^3.0.11",
     "@types/node-notifier": "^8.0.5",
     "@types/nodemailer": "^8.0.0",

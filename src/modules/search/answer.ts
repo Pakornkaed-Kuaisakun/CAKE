@@ -6,7 +6,7 @@ export async function searchAndAnswer(
   query: string,
   model?: string,
 ): Promise<string> {
-  const results = await search(query);
+  const results: SearchResult[] = await search(query);
 
   if (results.length === 0) {
     const r = await provider.chat([{ role: "user", content: query }], { model });

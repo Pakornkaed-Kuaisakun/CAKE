@@ -143,14 +143,16 @@ export class TieredMemoryManager {
   async reflectAndUpdate(model?: string, limit = 50): Promise<number> {
     if (!this.provider.embed || !this.provider.chat) return 0;
 
-    const entries = (this.store as any).listEntries() as import("./types.js").MemoryEntry[];
+    const entries = (
+      this.store as any
+    ).listEntries() as import("./types.js").MemoryEntry[];
     const toProcess = entries.slice(0, limit);
     let updated = 0;
 
     for (const e of toProcess) {
       try {
         const system = `You are an assistant that refines short memory summaries for long-term storage. Improve the summary to be factual, concise (<=200 chars), preserve important decisions/actions, and add a one-line tag if it contains an action or decision.`;
-        const user = `Original summary: ${e.text}\n\nFull content (may be truncated): ${e.metadata.fullContent ?? ''}\n\nReturn ONLY the improved summary. If you detect actions or decisions, prefix the summary with [ACTION] or [DECISION].`;
+        const user = `Original summary: ${e.text}\n\nFull content (may be truncated): ${e.metadata.fullContent ?? ""}\n\nReturn ONLY the improved summary. If you detect actions or decisions, prefix the summary with [ACTION] or [DECISION].`;
 
         const messages: Message[] = [
           { role: "system", content: system },

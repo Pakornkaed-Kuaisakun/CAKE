@@ -251,6 +251,20 @@ export class GeminiProvider implements AIProvider, BatchProvider {
     };
   }
 
+  // ── Embeddings ────────────────────────────────────────────────────────────
+
+  async embed(
+    text: string,
+    model = "text-embedding-004",
+  ): Promise<number[]> {
+    const genModel = this.client.getGenerativeModel({ model });
+    const response = await genModel.embedContent(text);
+    if (!response.embedding || !response.embedding.values) {
+      throw new Error(`Gemini embedding failed for model ${model}`);
+    }
+    return response.embedding.values;
+  }
+
   // ── Batch API ─────────────────────────────────────────────────────────────
 
   /**

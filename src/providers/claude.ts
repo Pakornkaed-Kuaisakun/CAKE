@@ -410,6 +410,41 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
     };
   }
 
+  // ── Embeddings ────────────────────────────────────────────────────────────
+
+  async embed(
+    text: string,
+    model = "voyage-3",
+  ): Promise<number[]> {
+    const apiKey = process.env.VOYAGE_API_KEY;
+    if (!apiKey) {
+      throw new Error(
+        "Anthropic/Claude does not support native embeddings. " +
+        "Please set the VOYAGE_API_KEY environment variable to use Voyage AI embeddings with Claude."
+      );
+    }
+    const response = await fetch("https://api.voyageai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        input: [text],
+        model,
+      }),
+    });
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Voyage AI embedding failed (${response.status}): ${errText}`);
+    }
+    const data: any = await response.json();
+    if (!data.data?.[0]?.embedding) {
+      throw new Error("Failed to generate embedding from Voyage AI API");
+    }
+    return data.data[0].embedding;
+  }
+
   // ── Batch API ─────────────────────────────────────────────────────────────
 
   /**
