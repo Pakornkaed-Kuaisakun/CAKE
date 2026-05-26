@@ -449,6 +449,10 @@ export const COMMANDS: CommandSuggestion[] = [
       ["deny", "ask", "allow"],
     ],
   },
+  { command: "/memory", description: "Show auto-memory status and stats" },
+  { command: "/memory recent", description: "Show auto-recorded decisions" },
+  { command: "/memory episodes", description: "Show conversation episodes" },
+  { command: "/memory facts", description: "Show auto-extracted facts" },
   {
     command: "deep_search <topic>",
     description:

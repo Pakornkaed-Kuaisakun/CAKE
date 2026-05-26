@@ -38,6 +38,7 @@ import {
   annotateHighRiskClaims,
 } from "../modules/hallucination/index.js";
 import { hallucinationConfig } from "./handlers/hallucination.js";
+import { AutoMemoryManager } from "./autoMemory.js";
 
 export { TokenBudgetTracker } from "./tokenBudgetTracker.js";
 
@@ -130,6 +131,7 @@ export class CakeAgent {
   private fastModel: string | undefined;
   private responseCache: ResponseCache;
   private awareness: UserAwarenessManager;
+  private autoMemory: AutoMemoryManager;
   private budgetTracker = new TokenBudgetTracker();
   private asyncQueue = new AsyncExecutionQueue();
 
@@ -145,6 +147,13 @@ export class CakeAgent {
     this.fastModel = getFastModel(this.provider.name);
     this.awareness = new UserAwarenessManager(provider, model);
     this.responseCache = new ResponseCache(100, 5 * 60_000);
+    this.autoMemory = new AutoMemoryManager(provider, {
+      decisionConfidence: 0.65, // Threshold for auto-record decision
+      memoryConfidence: 0.55, // Threshold for auto-index fact
+      reflectionInterval: 20, // turn between self-reflection
+      autoEpisode: true, // toggle auto-episode tracking
+      episodeInactivityTurns: 10, // auto-end episode after N turns inactive
+    });
 
     const cronManager = initCronManager(async (job) => {
       const msg = `[CRON] Running scheduled task: ${job.taskDescription}`;
@@ -192,6 +201,7 @@ export class CakeAgent {
     this.fastModel = getFastModel(provider.name);
     this.memory = new MemoryManager(provider);
     this.awareness.setProvider(provider, model);
+    this.autoMemory.setProvider(provider);
     clearIntentCache();
     this.responseCache = new ResponseCache(100, 5 * 60_000);
   }
@@ -199,6 +209,7 @@ export class CakeAgent {
   clearHistory(): void {
     this.history.clear();
     this.awareness.clearProfile();
+    this.autoMemory.resetSession();
   }
 
   shouldRetrieveMemory(inputLength: number): boolean {
@@ -526,7 +537,7 @@ export class CakeAgent {
     if (input.length > 30 && this.provider.embed) {
       if (!this.budgetTracker.isNearLimit()) {
         memories = await Promise.race([
-          this.memory.retrieve(input),
+          this.autoMemory.getRelevantContext(input),
           new Promise<string[]>((resolve) =>
             setTimeout(() => resolve([]), 600),
           ),
@@ -599,14 +610,7 @@ export class CakeAgent {
 
     this.history.push("assistant", result.text);
     this.awareness.observe(input, result.text);
-    this.rememberAsync(`User: ${input}\nAssistant: ${result.text}`, {
-      source: "conversation",
-    });
-    this.detectAndRecordDecisionsAsync(input, result.text).catch((err) => {
-      if (process.env.DEBUG) {
-        console.warn("[memory] decision detection failed:", err.message);
-      }
-    });
+    this.autoMemory.processTurn(input, result.text);
 
     if (result.usage) {
       this.budgetTracker.record(
@@ -775,9 +779,9 @@ Do NOT include markdown wrapping (like \`\`\`json), just raw JSON. Be conservati
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
         ],
-        { model: this.fastModel || this.model }
+        { model: this.fastModel || this.model },
       );
-      
+
       if (!resp || !resp.text) return;
       const trimmed = resp.text.trim();
       const cleanJson = trimmed.replace(/^```json\s*|```$/g, "").trim();
@@ -786,7 +790,7 @@ Do NOT include markdown wrapping (like \`\`\`json), just raw JSON. Be conservati
       if (parsed.hasDecision && parsed.decision) {
         const store = new DecisionStore();
         const activeEpisode = new EpisodeStore().getActiveEpisode();
-        
+
         let linkedMemoryIds: string[] = [];
         try {
           const entries = await this.memory.retrieveEntries(parsed.decision, 5);
@@ -803,12 +807,15 @@ Do NOT include markdown wrapping (like \`\`\`json), just raw JSON. Be conservati
             recordedBy: "auto",
             linkedMemoryIds,
             timestamp: Date.now(),
-          }
+          },
         );
       }
     } catch (err: any) {
       if (process.env.DEBUG) {
-        console.warn("[memory] detectAndRecordDecisionsAsync failed:", err.message);
+        console.warn(
+          "[memory] detectAndRecordDecisionsAsync failed:",
+          err.message,
+        );
       }
     }
   }

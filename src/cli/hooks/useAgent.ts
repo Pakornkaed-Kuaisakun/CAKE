@@ -308,6 +308,17 @@ export function useAgent() {
             return;
           }
 
+          case "memory": {
+            const { handleAutoMemoryStatus } =
+              await import("../../agent/handlers/autoMemoryStatus.js");
+            const result = await handleAutoMemoryStatus(
+              createProvider(providerName),
+              args,
+            );
+            addMsg("system", result.text);
+            return;
+          }
+
           case "exit":
           case "quit":
             exit();
