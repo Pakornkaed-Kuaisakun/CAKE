@@ -5,7 +5,9 @@
 //   2. Imports useVdbDocuments() for live document IDs on vdb_delete.
 //   3. Imports useItemHints() for live IDs on todo_remove / cron_remove / calendar_remove.
 //   4. Detects which <id> slot is active and injects live hints from disk.
-//   5. Everything else is identical to the original implementation.
+//   5. Imports useFinanceTickers() for live Yahoo Finance ticker suggestions.
+//   6. Detects finance <ticker> slot and finance <ticker> --pdf second slot.
+//   7. Everything else is identical to the original implementation.
 
 import { useMemo } from "react";
 import { COMMANDS } from "../data/commands.js";
@@ -17,6 +19,7 @@ import { useLockerHints } from "../hints/lockerHints.js";
 import { useMcpServers } from "./useMcpServers.js";
 import { useMcpTools } from "./useMcpTools.js";
 import { useMcpResources } from "./useMcpResources.js";
+import { useFinanceTickers } from "./useFinanceTickers.js";
 
 function stripPlaceholders(cmd: string): string {
   const cleaned = cmd.replace(/(<[^>]+>|\[[^\]]+\])/g, "").trimEnd();
@@ -104,6 +107,43 @@ function detectMcpReadSlot(words: string[]): boolean {
   return false;
 }
 
+/**
+ * Detects when the user is typing a ticker symbol for the finance command.
+ *
+ * Cases handled:
+ *   finance <typing>           → words[0]="finance", words.length===2 → ticker slot
+ *   finance $<typing>          → same, with $ prefix
+ *
+ * Returns the raw partial query the user typed (may be empty string).
+ * Returns null when NOT on a finance ticker slot.
+ */
+function detectFinanceTickerSlot(words: string[]): string | null {
+  if (words.length < 2) return null;
+  const cmd = words[0].toLowerCase();
+  if (cmd !== "finance") return null;
+
+  // words[1] is the ticker slot
+  // words[2] (if present) is the --pdf slot — not a ticker slot
+  if (words.length === 2) {
+    // Strip leading $ if present (user typed "$AAPL")
+    return words[1].replace(/^\$/, "");
+  }
+  return null;
+}
+
+/**
+ * Detect the --pdf slot: "finance <ticker> <typing>"
+ * Returns true only when cursor is at word[2] after a non-empty ticker.
+ */
+function detectFinancePdfSlot(words: string[]): boolean {
+  return (
+    words.length === 3 &&
+    words[0].toLowerCase() === "finance" &&
+    words[1].length > 0 &&
+    !words[1].startsWith("-")
+  );
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export function useAutocomplete(input: string) {
@@ -128,12 +168,26 @@ export function useAutocomplete(input: string) {
   const activeMcpCall = useMemo(() => detectMcpCallSlot(words), [words]);
   const activeMcpRead = useMemo(() => detectMcpReadSlot(words), [words]);
 
+  // Finance ticker slot detection
+  const financeTickerQuery = useMemo(
+    () => detectFinanceTickerSlot(words),
+    [words],
+  );
+  const financeTickerActive = financeTickerQuery !== null;
+  const financePdfSlot = useMemo(() => detectFinancePdfSlot(words), [words]);
+
   const docHints = useVdbDocuments(activeVdbCol);
   const removeHints = useItemHints(activeRemoveCmd);
   const lockerHints = useLockerHints(activeLocker);
   const mcpServerHints = useMcpServers();
   const mcpToolHints = useMcpTools();
   const mcpResourceHints = useMcpResources();
+
+  // Live ticker hook — only activates when on a finance ticker slot
+  const { filteredTickers, loading: tickerLoading } = useFinanceTickers(
+    financeTickerQuery ?? "",
+    financeTickerActive,
+  );
 
   // ── Merged command list ───────────────────────────────────────────────────
 
@@ -157,7 +211,56 @@ export function useAutocomplete(input: string) {
     const lower = lastPart.toLowerCase();
     const baseCommand = words[0].toLowerCase();
 
-    // ── 1. todo_remove / cron_remove / calendar_remove <id> ─────────────────
+    // ── 0. finance --pdf slot: "finance <ticker> <typing>" ───────────────────
+    if (financePdfSlot) {
+      const typed = words[2]?.toLowerCase() ?? "";
+      if ("--pdf".includes(typed)) {
+        return [
+          {
+            command: "--pdf",
+            description: "Export analysis as PDF report",
+            fullCommand: prefix
+              ? `${prefix} | finance ${words[1]} --pdf `
+              : `finance ${words[1]} --pdf `,
+          },
+        ];
+      }
+      return [];
+    }
+
+    // ── 1. finance <ticker> slot: live Yahoo Finance suggestions ─────────────
+    if (financeTickerActive) {
+      const typed = financeTickerQuery ?? "";
+
+      // Show filtered tickers from the live hook
+      const toShow =
+        filteredTickers.length > 0
+          ? filteredTickers
+          : // While loading or empty query before first fetch, show nothing
+            // (the hook already seeds filteredTickers from fallback for blank query)
+            [];
+
+      return toShow.map((ticker) => {
+        const typeLabel =
+          ticker.type === "ETF"
+            ? " [ETF]"
+            : ticker.type === "CRYPTO"
+              ? " [Crypto]"
+              : ticker.type === "INDEX"
+                ? " [Index]"
+                : "";
+
+        return {
+          command: ticker.symbol,
+          description: `${ticker.name}${typeLabel} · ${ticker.exchange}`,
+          fullCommand: prefix
+            ? `${prefix} | finance ${ticker.symbol} `
+            : `finance ${ticker.symbol} `,
+        };
+      });
+    }
+
+    // ── 2. todo_remove / cron_remove / calendar_remove <id> ─────────────────
     if (activeRemoveCmd && removeHints.length > 0) {
       const typed = words[1]?.toLowerCase() ?? "";
       const matched = removeHints.filter(
@@ -175,7 +278,7 @@ export function useAutocomplete(input: string) {
       }));
     }
 
-    // ── 1b. locker commands <id|label> ───────────────────────────────────────
+    // ── 2b. locker commands <id|label> ───────────────────────────────────────
     if (activeLocker && lockerHints.length > 0) {
       const typed = words[1]?.toLowerCase() ?? "";
       const matched = lockerHints.filter(
@@ -193,11 +296,11 @@ export function useAutocomplete(input: string) {
       }));
     }
 
-    // ── 1c. MCP Server commands <name> ───────────────────────────────────────
+    // ── 2c. MCP Server commands <name> ───────────────────────────────────────
     if (activeMcpServer && mcpServerHints.length > 0) {
       const typed = words[1]?.toLowerCase() ?? "";
-      const matched = mcpServerHints.filter(
-        (h) => h.toLowerCase().includes(typed)
+      const matched = mcpServerHints.filter((h) =>
+        h.toLowerCase().includes(typed),
       );
 
       return matched.map((h) => ({
@@ -209,13 +312,13 @@ export function useAutocomplete(input: string) {
       }));
     }
 
-    // ── 1d. MCP Call <tool> ──────────────────────────────────────────────────
+    // ── 2d. MCP Call <tool> ──────────────────────────────────────────────────
     if (activeMcpCall && mcpToolHints.length > 0) {
       const typed = words[1]?.toLowerCase() ?? "";
       const matched = mcpToolHints.filter(
         (h) =>
           h.name.toLowerCase().includes(typed) ||
-          h.description.toLowerCase().includes(typed)
+          h.description.toLowerCase().includes(typed),
       );
 
       return matched.map((h) => ({
@@ -227,13 +330,13 @@ export function useAutocomplete(input: string) {
       }));
     }
 
-    // ── 1e. MCP Read <uri> ──────────────────────────────────────────────────
+    // ── 2e. MCP Read <uri> ──────────────────────────────────────────────────
     if (activeMcpRead && mcpResourceHints.length > 0) {
       const typed = words[1]?.toLowerCase() ?? "";
       const matched = mcpResourceHints.filter(
         (h) =>
           h.uri.toLowerCase().includes(typed) ||
-          h.name.toLowerCase().includes(typed)
+          h.name.toLowerCase().includes(typed),
       );
 
       return matched.map((h) => ({
@@ -245,7 +348,7 @@ export function useAutocomplete(input: string) {
       }));
     }
 
-    // ── 2. vdb_delete <collection> <doc_id> ─────────────────────────────────
+    // ── 3. vdb_delete <collection> <doc_id> ─────────────────────────────────
     if (activeVdbCol && docHints.length > 0) {
       const typed = words[2]?.toLowerCase() ?? "";
       const matched = docHints.filter(
@@ -266,7 +369,7 @@ export function useAutocomplete(input: string) {
       return [];
     }
 
-    // ── 3. Generic 2D / 1D parameter completion ──────────────────────────────
+    // ── 4. Generic 2D / 1D parameter completion ──────────────────────────────
     const exactCmd = ALL_COMMANDS.find(
       (cmd) =>
         (cmd.command.toLowerCase() === baseCommand ||
@@ -326,7 +429,7 @@ export function useAutocomplete(input: string) {
       }
     }
 
-    // ── 4. Command name prefix match ──────────────────────────────────────────
+    // ── 5. Command name prefix match ──────────────────────────────────────────
     const filtered = ALL_COMMANDS.filter((cmd) =>
       cmd.command.toLowerCase().includes(lower),
     );
@@ -356,5 +459,9 @@ export function useAutocomplete(input: string) {
     mcpToolHints,
     activeMcpRead,
     mcpResourceHints,
+    financeTickerActive,
+    financeTickerQuery,
+    filteredTickers,
+    financePdfSlot,
   ]);
 }
