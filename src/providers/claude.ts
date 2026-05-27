@@ -24,6 +24,12 @@
 //   Cancel:   POST /v1/messages/batches/{id}/cancel
 //   Results:  GET  /v1/messages/batches/{id}/results  (NDJSON stream)
 //   50% cheaper than single requests, up to 24h processing window.
+//
+// Embeddings:
+//   Primary:  Voyage AI (VOYAGE_API_KEY) — voyage-3, 1024 dims, high quality
+//   Fallback: Deterministic hash-based vector (256 dims, keyword-aware)
+//             Works without any API key. Lower semantic quality but functional
+//             for memory/search features. Set CAKE_EMBED=hash to force.
 
 import Anthropic from "@anthropic-ai/sdk";
 import type {
@@ -102,6 +108,92 @@ function calcCost(
   );
 }
 
+// ── Hash-based fallback embedding ─────────────────────────────────────────────
+//
+// Produces a deterministic 256-dimensional float vector from text.
+// Uses multiple hash seeds + TF-style term weighting to give semantically
+// similar texts overlapping dimensions. Quality is lower than neural
+// embeddings but sufficient for basic memory recall and deduplication.
+//
+// Dimensions are seeded with FNV-1a hashes at different offsets so
+// each dimension "listens" to different character n-grams.
+
+const EMBED_DIMS = 256;
+
+function fnv1a(s: string, seed = 2166136261): number {
+  let h = seed >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+function hashEmbed(text: string): number[] {
+  const lower = text.toLowerCase();
+
+  // Tokenise: words + bigrams
+  const words = lower.match(/\b\w+\b/g) ?? [];
+  const tokens: string[] = [...words];
+  for (let i = 0; i < words.length - 1; i++) {
+    tokens.push(words[i] + "_" + words[i + 1]);
+  }
+  // Character trigrams for morphological coverage
+  for (let i = 0; i < lower.length - 2; i++) {
+    tokens.push(lower.slice(i, i + 3));
+  }
+
+  const vec = new Float64Array(EMBED_DIMS);
+
+  for (const token of tokens) {
+    // Each token votes on multiple dimensions via different seeds
+    for (let seed = 0; seed < 4; seed++) {
+      const h = fnv1a(token, 2166136261 + seed * 1000003);
+      const dim = h % EMBED_DIMS;
+      // Sign alternation prevents all tokens adding in same direction
+      const sign = (h >> 16) & 1 ? 1 : -1;
+      vec[dim] += sign;
+    }
+  }
+
+  // L2 normalise
+  let norm = 0;
+  for (let i = 0; i < EMBED_DIMS; i++) norm += vec[i] * vec[i];
+  norm = Math.sqrt(norm) || 1;
+  const result: number[] = new Array(EMBED_DIMS);
+  for (let i = 0; i < EMBED_DIMS; i++) result[i] = vec[i] / norm;
+  return result;
+}
+
+// ── Voyage AI embedding ───────────────────────────────────────────────────────
+
+async function voyageEmbed(text: string, model: string): Promise<number[]> {
+  const apiKey = process.env.VOYAGE_API_KEY;
+  if (!apiKey) throw new Error("VOYAGE_API_KEY not set");
+
+  const response = await fetch("https://api.voyageai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ input: [text], model }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(
+      `Voyage AI embedding failed (${response.status}): ${errText}`,
+    );
+  }
+
+  const data: any = await response.json();
+  if (!data.data?.[0]?.embedding) {
+    throw new Error("Failed to generate embedding from Voyage AI API");
+  }
+  return data.data[0].embedding;
+}
+
 // ── Message builders ──────────────────────────────────────────────────────────
 
 type AnthropicMessage = {
@@ -161,15 +253,6 @@ function buildSystemBlocks(systemText: string): SystemBlock[] {
 
 // ── Thinking helpers ──────────────────────────────────────────────────────────
 
-/**
- * Map a ThinkingConfig to the Anthropic API shape.
- * Extended thinking requires:
- *   - beta header "interleaved-thinking-2025-05-14"
- *   - betas: ["interleaved-thinking-2025-05-14"] in the request
- *   - thinking block in the request body
- *   - temperature = 1 (required by API when thinking is enabled)
- *   - budgetTokens >= 1024
- */
 function buildThinkingParam(
   thinking: NonNullable<ChatOptions["thinking"]>,
   maxTokens: number,
@@ -179,7 +262,6 @@ function buildThinkingParam(
 } | null {
   if (!thinking.enabled) return null;
 
-  // Map level → token budget if explicit budgetTokens not provided
   const levelMap: Record<string, number> = {
     low: 1024,
     medium: 4096,
@@ -188,17 +270,14 @@ function buildThinkingParam(
 
   const rawBudget =
     thinking.budgetTokens ?? (thinking.level ? levelMap[thinking.level] : 1024);
-
-  // Budget must be >= 1024 and < maxTokens
   const budget = Math.max(1024, Math.min(rawBudget, maxTokens - 1));
 
   return {
     thinking: { type: "enabled", budget_tokens: budget },
-    temperature: 1, // required when thinking is enabled
+    temperature: 1,
   };
 }
 
-/** Extract text and thinking content blocks from a response */
 function extractContent(blocks: any[]): { text: string; thinking: string } {
   let text = "";
   let thinking = "";
@@ -265,7 +344,6 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
     const system = buildSystemBlocks(systemText);
     const builtMessages = buildCachedMessages(chatMessages);
 
-    // Build thinking params if requested
     const thinkingParam = thinking
       ? buildThinkingParam(thinking, maxTokens)
       : null;
@@ -280,7 +358,6 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
 
     if (thinkingParam) {
       requestBody.thinking = thinkingParam.thinking;
-      // Extended thinking requires the beta header
       requestBody.betas = ["interleaved-thinking-2025-05-14"];
     }
 
@@ -379,13 +456,10 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
         const deltaType = (event.delta as any).type;
 
         if (deltaType === "text_delta") {
-          // text_delta is ALWAYS visible response text — never thinking content.
-          // The SDK emits thinking_delta (not text_delta) for thinking blocks.
           const chunk = (event.delta as any).text as string;
           fullText += chunk;
           onChunk(chunk);
         } else if (deltaType === "thinking_delta") {
-          // thinking_delta is ONLY emitted when extended thinking is active.
           thinkingText += (event.delta as any).thinking ?? "";
         }
       }
@@ -411,47 +485,38 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
   }
 
   // ── Embeddings ────────────────────────────────────────────────────────────
+  //
+  // Priority order:
+  //   1. VOYAGE_API_KEY set + CAKE_EMBED != "hash" → Voyage AI (best quality)
+  //   2. CAKE_EMBED=hash OR no Voyage key           → hash fallback (always works)
+  //
+  // The hash fallback means memory/search features always function with
+  // Claude — no external key required. Semantic quality is lower but the
+  // recall rate for recent/exact content is good enough for conversation memory.
 
-  async embed(
-    text: string,
-    model = "voyage-3",
-  ): Promise<number[]> {
-    const apiKey = process.env.VOYAGE_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        "Anthropic/Claude does not support native embeddings. " +
-        "Please set the VOYAGE_API_KEY environment variable to use Voyage AI embeddings with Claude."
-      );
+  async embed(text: string, model = "voyage-3"): Promise<number[]> {
+    const forceHash = process.env.CAKE_EMBED === "hash";
+    const hasVoyageKey = !!process.env.VOYAGE_API_KEY;
+
+    if (!forceHash && hasVoyageKey) {
+      try {
+        return await voyageEmbed(text, model);
+      } catch (err: any) {
+        if (process.env.DEBUG) {
+          console.warn(
+            "[claude.embed] Voyage AI failed, using hash fallback:",
+            err.message,
+          );
+        }
+      }
     }
-    const response = await fetch("https://api.voyageai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        input: [text],
-        model,
-      }),
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Voyage AI embedding failed (${response.status}): ${errText}`);
-    }
-    const data: any = await response.json();
-    if (!data.data?.[0]?.embedding) {
-      throw new Error("Failed to generate embedding from Voyage AI API");
-    }
-    return data.data[0].embedding;
+
+    // Hash-based fallback — always available, no API key needed
+    return hashEmbed(text);
   }
 
   // ── Batch API ─────────────────────────────────────────────────────────────
 
-  /**
-   * Submit a batch of requests to /v1/messages/batches.
-   * Up to 10,000 requests per batch, 50% cost savings vs individual calls.
-   * Processing window: up to 24 hours.
-   */
   async submitBatch(requests: BatchRequest[]): Promise<BatchSubmitResult> {
     const batchRequests = requests.map((req) => {
       const systemMessages = req.messages.filter((m) => m.role === "system");
@@ -505,9 +570,6 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
     };
   }
 
-  /**
-   * Poll a batch by ID. When completed, streams and parses NDJSON results.
-   */
   async pollBatch(batchId: string): Promise<BatchPollResult> {
     const batch = await (this.client.messages.batches as any).retrieve(batchId);
     const status = mapBatchStatus(batch.processing_status);
@@ -531,7 +593,6 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
       };
     }
 
-    // Stream NDJSON results
     const responses: BatchResponse[] = [];
 
     try {
@@ -578,7 +639,6 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
         }
       }
     } catch (err: any) {
-      // If results URL not yet available or parse error
       return {
         batchId,
         status: "failed",
@@ -596,18 +656,10 @@ export class ClaudeProvider implements AIProvider, BatchProvider {
     };
   }
 
-  /**
-   * Cancel a pending batch.
-   */
   async cancelBatch(batchId: string): Promise<void> {
     await (this.client.messages.batches as any).cancel(batchId);
   }
 
-  /**
-   * Submit a batch and poll until completed.
-   * @param intervalMs - polling interval in ms (default 10 000)
-   * @param timeoutMs  - max wait in ms (default 24 h)
-   */
   async runBatch(
     requests: BatchRequest[],
     opts: { intervalMs?: number; timeoutMs?: number } = {},

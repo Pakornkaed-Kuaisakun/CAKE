@@ -453,6 +453,13 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "/memory recent", description: "Show auto-recorded decisions" },
   { command: "/memory episodes", description: "Show conversation episodes" },
   { command: "/memory facts", description: "Show auto-extracted facts" },
+  { command: "/skills", description: "List loaded skills" },
+  { command: "/skills info <name>", description: "Show skill details" },
+  { command: "/skills reload", description: "Hot-reload skills from disk" },
+  {
+    command: "/skills match <text>",
+    description: "Test which skills activate",
+  },
   {
     command: "deep_search <topic>",
     description:

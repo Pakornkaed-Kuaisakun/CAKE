@@ -29,7 +29,10 @@ import {
   resetCosts,
   costsFilePath,
 } from "../../config/costs.js";
-import { consumeEmbedWarning } from "../../modules/memory/index.js";
+import {
+  consumeEmbedWarning,
+  getEmbedQualityWarning,
+} from "../../modules/memory/index.js";
 import { handleSessionCommand } from "../../agent/handlers/session.js";
 import { usePermission } from "./usePermission.js";
 import { handlePermissionsCommand } from "../../agent/handlers/permissions.js";
@@ -192,15 +195,9 @@ export function useAgent() {
   }, []);
 
   const checkEmbedWarning = useCallback(() => {
-    if (consumeEmbedWarning()) {
-      addMsg(
-        "system",
-        "⚠️  Memory disabled — this provider does not support embeddings.\n" +
-          "   Long-term memory will not be saved this session.\n" +
-          "   Use openai or ollama (+ nomic-embed-text) to enable it.",
-      );
-    }
-  }, [addMsg]);
+    const warning = getEmbedQualityWarning(providerName);
+    if (warning) addMsg("system", warning);
+  }, [addMsg, providerName]);
 
   // ─── Submit handler ────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
@@ -312,6 +309,17 @@ export function useAgent() {
             const { handleAutoMemoryStatus } =
               await import("../../agent/handlers/autoMemoryStatus.js");
             const result = await handleAutoMemoryStatus(
+              createProvider(providerName),
+              args,
+            );
+            addMsg("system", result.text);
+            return;
+          }
+
+          case "skills": {
+            const { handleSkillsCommand } =
+              await import("../../agent/handlers/skills.js");
+            const result = await handleSkillsCommand(
               createProvider(providerName),
               args,
             );

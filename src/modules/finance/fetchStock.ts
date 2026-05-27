@@ -1,5 +1,7 @@
 import YahooFinance from "yahoo-finance2";
-const yahooFinance = new YahooFinance();
+const yahooFinance = new YahooFinance({
+  suppressNotices: ["yahooSurvey"],
+});
 import type { StockData } from "./types.js";
 
 export async function fetchStockData(symbol: string): Promise<StockData> {

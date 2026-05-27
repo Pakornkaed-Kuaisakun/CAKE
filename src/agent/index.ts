@@ -39,6 +39,13 @@ import {
 } from "../modules/hallucination/index.js";
 import { hallucinationConfig } from "./handlers/hallucination.js";
 import { AutoMemoryManager } from "./autoMemory.js";
+import {
+  loadAllSkills,
+  registerSkills,
+  findBestSkill,
+  runWithSkill,
+  skillNeedsConfirmation,
+} from "./skills/index.js";
 
 export { TokenBudgetTracker } from "./tokenBudgetTracker.js";
 
@@ -188,6 +195,13 @@ export class CakeAgent {
         if (onLog) onLog(msg);
         else console.warn(msg);
       });
+
+    try {
+      const skills = loadAllSkills((msg) => onLog?.(msg));
+      registerSkills(skills);
+    } catch (err: any) {
+      onLog?.(`[skills] Load error: ${err.message}`);
+    }
   }
 
   setModel(model: string | undefined): void {
@@ -473,6 +487,35 @@ export class CakeAgent {
 
     const intent = await aiIntentRouter(this.provider, trimmed, this.fastModel);
     const aiHandler = intentMap[intent];
+
+    const matchedSkill = findBestSkill(trimmed, intent);
+    if (matchedSkill && aiHandler) {
+      if (!UNCACHEABLE_INTENTS.has(intent)) {
+        const cached = this.responseCache.get(cacheKey);
+        if (cached) return cached;
+      }
+
+      emit({
+        phase: "tool",
+        label: `${matchedSkill.meta.name} skill…`,
+        tool: intent,
+      });
+
+      const rawResult = await runWithSkill(
+        matchedSkill,
+        trimmed,
+        this.provider,
+        this.model,
+        opts,
+        {
+          baseSystemPrompt: STATIC_CORE_PROMPT,
+          baseHandler: aiHandler,
+        },
+      );
+
+      emit({ phase: "done", label: "Done" });
+      return { text: rawResult.text, usage: rawResult.usage };
+    }
 
     if (aiHandler) {
       if (!UNCACHEABLE_INTENTS.has(intent)) {
