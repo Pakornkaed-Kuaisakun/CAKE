@@ -30,6 +30,7 @@ const VALID_CATEGORIES = new Set<OperationCategory>([
   "file_delete",
   "file_edit",
   "export",
+  "finance",
 ]);
 
 const VALID_LEVELS = new Set<PermissionLevel>(["deny", "ask", "allow"]);

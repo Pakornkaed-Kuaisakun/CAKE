@@ -16,22 +16,24 @@ export async function handleIndexDocument(
 
     const rawPath = match[1].trim().replace(/^["']|["']$/g, "");
     const filePath = path.resolve(rawPath);
-    
+
     const content = await readDocument(filePath);
     const chunks = chunkText(content, 2000, 200); // ใช้ chunk เล็กสำหรับการเก็บจำ
 
     const memory = new MemoryManager(provider);
-    
+
     // Index แต่ละ chunk ลงใน Vector Store
     for (const chunk of chunks) {
-      await memory.remember(chunk, { 
-        source: "file-index", 
+      await memory.remember(chunk, {
+        source: "file-index",
         fileName: path.basename(filePath),
-        fullPath: filePath 
+        fullPath: filePath,
       });
     }
 
-    return text(`✅ Learned ${chunks.length} segments from ${path.basename(filePath)}. I will remember this context in future conversations.`);
+    return text(
+      `✅ Learned ${chunks.length} segments from ${path.basename(filePath)}. I will remember this context in future conversations.`,
+    );
   } catch (error: any) {
     return text(`Failed to index document.\n${error.message}`);
   }
@@ -42,8 +44,9 @@ export async function handleForgetMemory(
   _input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  // ฟีเจอร์ลบความจำ (Optional)
-  return text("Memory clearing feature is not implemented yet but can be done by deleting data/memory/vectors.json");
+  return text(
+    "Memory clearing feature is not implemented yet but can be done by deleting data/memory/vectors.json",
+  );
 }
 
 export async function handleMemorySearch(
@@ -100,7 +103,10 @@ export async function handleEpisodeStart(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:episode_start|start episode)\s+(.+)/i);
-    if (!match) return text("Please provide an episode title. Usage: episode_start <title>");
+    if (!match)
+      return text(
+        "Please provide an episode title. Usage: episode_start <title>",
+      );
 
     const title = match[1].trim();
     const store = new EpisodeStore();
@@ -118,10 +124,15 @@ export async function handleEpisodeEnd(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:episode_end|end episode)\s+([\w-]+)/i);
-    if (!match) return text("Please provide an episode id. Usage: episode_end <id> [summary]");
+    if (!match)
+      return text(
+        "Please provide an episode id. Usage: episode_end <id> [summary]",
+      );
 
     const id = match[1].trim();
-    const summaryMatch = input.match(/(?:episode_end|end episode)\s+[\w-]+\s+([\s\S]+)/i);
+    const summaryMatch = input.match(
+      /(?:episode_end|end episode)\s+[\w-]+\s+([\s\S]+)/i,
+    );
     const summary = summaryMatch ? summaryMatch[1].trim() : undefined;
 
     const store = new EpisodeStore();
@@ -142,7 +153,9 @@ export async function handleEpisodeList(
     const store = new EpisodeStore();
     const list = store.listEpisodes();
     if (!list.length) return text("No episodes recorded.");
-    const body = list.map((e) => `- ${e.title} (id: ${e.id}) ${e.end ? `ended` : `active`}`).join("\n");
+    const body = list
+      .map((e) => `- ${e.title} (id: ${e.id}) ${e.end ? `ended` : `active`}`)
+      .join("\n");
     return text(`Episodes:\n${body}`);
   } catch (err: any) {
     return text(`Failed to list episodes: ${err.message}`);
@@ -156,7 +169,10 @@ export async function handleDecisionRecord(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:decision_record|record decision)\s+(.+)/i);
-    if (!match) return text("Please provide a decision text. Usage: decision_record <text> [--episode=<id>] [--rationale=<text>]");
+    if (!match)
+      return text(
+        "Please provide a decision text. Usage: decision_record <text> [--episode=<id>] [--rationale=<text>]",
+      );
 
     // naive parsing: look for --episode= and --rationale=
     let payload = match[1].trim();
@@ -186,7 +202,10 @@ export async function handleDecisionRecord(
       // ignore failures to link
     }
 
-    const d = store.addDecision(payload, rationale, episodeId, { recordedBy: "user", linkedMemoryIds: linked });
+    const d = store.addDecision(payload, rationale, episodeId, {
+      recordedBy: "user",
+      linkedMemoryIds: linked,
+    });
     return text(`Recorded decision (id: ${d.id}).`);
   } catch (err: any) {
     return text(`Failed to record decision: ${err.message}`);
@@ -199,12 +218,21 @@ export async function handleDecisionList(
   _model?: string,
 ): Promise<ChatResult> {
   try {
-    const match = input.match(/(?:decision_list|list decisions)(?:\s+([\w-]+))?/i);
+    const match = input.match(
+      /(?:decision_list|list decisions)(?:\s+([\w-]+))?/i,
+    );
     const episodeId = match && match[1] ? match[1] : undefined;
     const store = new DecisionStore();
-    const list = episodeId ? store.listForEpisode(episodeId) : store.listDecisions(50);
+    const list = episodeId
+      ? store.listForEpisode(episodeId)
+      : store.listDecisions(50);
     if (!list.length) return text("No decisions recorded.");
-    const body = list.map((d) => `- ${new Date(d.timestamp).toISOString()} ${d.episodeId ? `(ep:${d.episodeId}) ` : ""}${d.text}${d.rationale ? ` — rationale: ${d.rationale}` : ""}`).join("\n\n");
+    const body = list
+      .map(
+        (d) =>
+          `- ${new Date(d.timestamp).toISOString()} ${d.episodeId ? `(ep:${d.episodeId}) ` : ""}${d.text}${d.rationale ? ` — rationale: ${d.rationale}` : ""}`,
+      )
+      .join("\n\n");
     return text(`Decisions:\n\n${body}`);
   } catch (err: any) {
     return text(`Failed to list decisions: ${err.message}`);
@@ -217,15 +245,21 @@ export async function handleSelfReflect(
   model?: string,
 ): Promise<ChatResult> {
   try {
-    const match = input.match(/(?:self_reflect|self-reflect|reflect memories|reflect_memories)(?:\s+(\d+))?/i);
+    const match = input.match(
+      /(?:self_reflect|self-reflect|reflect memories|reflect_memories)(?:\s+(\d+))?/i,
+    );
     // optional number = max entries to process
     const limit = match && match[1] ? parseInt(match[1], 10) : 50;
 
-    const memory = new (await import("../../modules/memory/index.js")).MemoryManager(provider);
+    const memory = new (
+      await import("../../modules/memory/index.js")
+    ).MemoryManager(provider);
     // call reflectAndUpdate on TieredMemoryManager
     const updated = await (memory as any).reflectAndUpdate(model, limit);
 
-    return text(`Self-reflection completed. Updated ${updated} memory entries.`);
+    return text(
+      `Self-reflection completed. Updated ${updated} memory entries.`,
+    );
   } catch (err: any) {
     return text(`Self-reflection failed: ${err.message}`);
   }
@@ -237,8 +271,11 @@ export async function handleEpisodeSummary(
   model?: string,
 ): Promise<ChatResult> {
   try {
-    const match = input.match(/(?:episode_summary|summary episode)\s+([\w-]+)/i);
-    if (!match) return text("Please provide an episode id. Usage: episode_summary <id>");
+    const match = input.match(
+      /(?:episode_summary|summary episode)\s+([\w-]+)/i,
+    );
+    if (!match)
+      return text("Please provide an episode id. Usage: episode_summary <id>");
 
     const id = match[1];
     const store = new EpisodeStore();
@@ -246,11 +283,14 @@ export async function handleEpisodeSummary(
     if (!ep) return text(`Episode not found: ${id}`);
 
     const msgs = store.readMessages(id);
-    if (!msgs || msgs.length === 0) return text("No messages found for this episode.");
+    if (!msgs || msgs.length === 0)
+      return text("No messages found for this episode.");
 
     // Build content for summarization (cap length)
     const joined = msgs
-      .map((m: any) => `${m.role.toUpperCase()}: ${m.displayContent ?? m.content}`)
+      .map(
+        (m: any) => `${m.role.toUpperCase()}: ${m.displayContent ?? m.content}`,
+      )
       .join("\n\n");
 
     const content = joined.length > 30_000 ? joined.slice(-30_000) : joined;
@@ -259,7 +299,10 @@ export async function handleEpisodeSummary(
 
     const messages: Message[] = [
       { role: "system", content: systemPrompt },
-      { role: "user", content: `Summarize the following conversation (episode: ${ep.title}):\n\n${content}` },
+      {
+        role: "user",
+        content: `Summarize the following conversation (episode: ${ep.title}):\n\n${content}`,
+      },
     ];
 
     const chatOpts = { model };
