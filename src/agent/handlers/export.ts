@@ -7,6 +7,7 @@ import {
   getPermissionLevel,
   type PermissionRequest,
   type PermissionDecision,
+  OperationCategory,
 } from "../permissions/index.js";
 
 type ExportFormat = "txt" | "md" | "json" | "csv" | "html";
@@ -140,7 +141,7 @@ export async function exportSink(
   const ask = _askHandler ?? defaultAskHandler;
   const guard = await guardOperation(
     {
-      category: "export",
+      category: _command as OperationCategory,
       description: "Write output to file",
       detail: outPath,
     },

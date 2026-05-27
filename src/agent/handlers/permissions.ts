@@ -30,6 +30,7 @@ const VALID_CATEGORIES = new Set<OperationCategory>([
   "file_delete",
   "file_edit",
   "export",
+  "chat_export",
   "finance",
 ]);
 
@@ -41,6 +42,7 @@ const DEFAULTS: Record<OperationCategory, PermissionLevel> = {
   file_delete: "ask",
   file_edit: "ask",
   export: "allow",
+  chat_export: "allow",
   finance: "ask",
 };
 

@@ -40,16 +40,17 @@ export async function handleChatExport(
   const pipeIdx = withoutVerb.indexOf("|");
   if (pipeIdx === -1) {
     return {
-      text: "Usage: chat_export <format> <filename>|<prompt describing what to write>\n" +
-            "Example: chat_export md report.md|Write a comprehensive report on TypeScript ORMs",
+      text:
+        "Usage: chat_export <format> <filename>|<prompt describing what to write>\n" +
+        "Example: chat_export md report.md|Write a comprehensive report on TypeScript ORMs",
     };
   }
 
   const rawArgs = withoutVerb.slice(0, pipeIdx).trim(); // e.g. "md ukraine_war.md"
-  const prompt  = withoutVerb.slice(pipeIdx + 1).trim(); // the AI composition prompt
+  const prompt = withoutVerb.slice(pipeIdx + 1).trim(); // the AI composition prompt
 
   if (!prompt) {
-    return { text: "chat_export: prompt (after \"|\") must not be empty." };
+    return { text: 'chat_export: prompt (after "|") must not be empty.' };
   }
 
   // Step 1 — Ask the AI to compose the full content.
@@ -58,7 +59,9 @@ export async function handleChatExport(
   const chatResult = await handleChat(provider, prompt, model);
 
   if (!chatResult.text?.trim()) {
-    return { text: "chat_export: AI returned empty content — file not written." };
+    return {
+      text: "chat_export: AI returned empty content — file not written.",
+    };
   }
 
   // Step 2 — Write directly to disk via the shared exportSink.

@@ -79,7 +79,7 @@ export async function planNextStep(
       {
         role: "user",
         content:
-          'Your response was not valid JSON. Output ONLY the raw JSON object — no <think> tags, no <thinking> tags, no markdown, no prose, no code fences. ' +
+          "Your response was not valid JSON. Output ONLY the raw JSON object — no <think> tags, no <thinking> tags, no markdown, no prose, no code fences. " +
           'Example: {"thought":"...","tool":"...","input":"..."}',
       },
     ],

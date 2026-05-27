@@ -15,6 +15,7 @@ import { useCallback, useRef } from "react";
 import { setBashAskHandler } from "../../agent/handlers/bash.js";
 import { setFileAskHandler } from "../../agent/handlers/file.js";
 import { setExportAskHandler } from "../../agent/handlers/export.js";
+import { setReportAskHandler } from "../../agent/handlers/finance.js";
 import type {
   PermissionRequest,
   PermissionDecision,
@@ -61,6 +62,7 @@ export function usePermission(addMsg: AddMsg): UsePermissionReturn {
     setBashAskHandler(makeAskHandler);
     setFileAskHandler(makeAskHandler);
     setExportAskHandler(makeAskHandler);
+    setReportAskHandler(makeAskHandler);
   }, [makeAskHandler]);
 
   const interceptPermission = useCallback(

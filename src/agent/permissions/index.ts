@@ -31,6 +31,7 @@ export type OperationCategory =
   | "file_delete"
   | "file_edit"
   | "export"
+  | "chat_export"
   | "finance";
 
 export interface PermissionMap {
@@ -39,6 +40,7 @@ export interface PermissionMap {
   file_delete: PermissionLevel;
   file_edit: PermissionLevel;
   export: PermissionLevel;
+  chat_export: PermissionLevel;
   finance: PermissionLevel;
 }
 
@@ -60,6 +62,7 @@ const DEFAULTS: PermissionMap = {
   file_delete: "ask",
   file_edit: "ask",
   export: "allow", // export is explicit intent — allow by default
+  chat_export: "allow",
   finance: "ask",
 };
 
@@ -78,6 +81,7 @@ export function loadPermissions(): PermissionMap {
       file_delete: parsed.file_delete ?? DEFAULTS.file_delete,
       file_edit: parsed.file_edit ?? DEFAULTS.file_edit,
       export: parsed.export ?? DEFAULTS.export,
+      chat_export: parsed.chat_export ?? DEFAULTS.chat_export,
       finance: parsed.finance ?? DEFAULTS.finance,
     };
   } catch {
@@ -222,6 +226,7 @@ export const CATEGORY_LABELS: Record<OperationCategory, string> = {
   file_delete: "Delete files",
   file_edit: "Edit / modify files",
   export: "Export output to disk",
+  chat_export: "Export file to AI chat (auto command)",
   finance: "Report Stock as PDF",
 };
 

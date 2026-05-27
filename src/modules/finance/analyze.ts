@@ -1,6 +1,10 @@
 // src/modules/finance/analyze.ts
 //
 // AI-powered stock analysis — uses the enhanced data for deeper insights.
+//
+// FIX: Removed two truncation sources:
+//   1. longBusinessSummary.slice(0, 400) → now uses full summary (up to 2000 chars)
+//   2. maxTokens: 800 → raised to 2048 so the analysis is never cut mid-sentence
 
 import type { AIProvider } from "../../providers/types.js";
 import type { StockData } from "./types.js";
@@ -36,6 +40,14 @@ export async function analyzeStock(
   // Build a compact data summary for the LLM
   const enhanced = stock as EnhancedStockData;
   const basic = stock as StockData;
+
+  // FIX: was .slice(0, 400) — now allows up to 2000 chars so the business
+  // context is not arbitrarily cut off mid-sentence.
+  const businessSummary = (
+    enhanced.longBusinessSummary ??
+    basic.summary ??
+    ""
+  ).slice(0, 2000);
 
   const dataBlock = [
     `Company: ${enhanced.longName ?? basic.shortName ?? enhanced.symbol ?? basic.symbol}`,
@@ -74,16 +86,18 @@ export async function analyzeStock(
     `Yield: ${enhanced.dividendYield ? formatPct(enhanced.dividendYield * 100) : "None"}`,
     `Payout Ratio: ${enhanced.payoutRatio ? formatPct(enhanced.payoutRatio * 100) : "N/A"}`,
     ``,
-    `Business Summary (first 400 chars):`,
-    (enhanced.longBusinessSummary ?? basic.summary ?? "").slice(0, 400),
+    `Business Summary:`,
+    businessSummary,
   ].join("\n");
 
+  // FIX: was maxTokens: 800 — too low for a full 5-section analysis.
+  // Raised to 2048 so the Verdict section is never truncated mid-sentence.
   const response = await provider.chat(
     [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: dataBlock },
     ],
-    { model, maxTokens: 800 },
+    { model, maxTokens: 2048 },
   );
 
   return response;
