@@ -1,6 +1,0 @@
-[WEATHER] Location from IP: Hat Yai,Songkhla,TH (7.0084, 100.4767)
-Current: 28.2°C, Overcast, wind speed 3.8km/h, humidity 79%
-Forecast
-- 2026-05-09: Moderate drizzle, 24°C to 30.9°C, Precipitation: 2mm, Max P: 65%
-- 2026-05-10: Thunderstorm, 24.3°C to 31.6°C, Precipitation: 4.9mm, Max P: 94%
-- 2026-05-11: Moderate rain showers, 24.5°C to 29.5°C, Precipitation: 7.8mm, Max P: 98%
