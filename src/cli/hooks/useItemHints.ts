@@ -21,6 +21,8 @@ import {
   readCalendarHints,
   readAsyncHints,
   readAsyncPendingHints,
+  readTqHints,
+  readTqPendingHints,
   type ItemHint,
 } from "../hints/itemHintReaders.js";
 
@@ -31,6 +33,12 @@ export type RemoveCommand =
   | "calendar_remove"
   | "async_status"
   | "async_cancel"
+  | "tq_status"
+  | "tq_cancel"
+  | "tq_pause"
+  | "tq_resume"
+  | "tq_retry"
+  | "tq_priority"
   | "";
 
 function read(cmd: RemoveCommand): ItemHint[] {
@@ -45,6 +53,14 @@ function read(cmd: RemoveCommand): ItemHint[] {
       return readAsyncHints();
     case "async_cancel":
       return readAsyncPendingHints();
+    case "tq_status":
+      return readTqHints();
+    case "tq_cancel":
+    case "tq_pause":
+    case "tq_resume":
+    case "tq_retry":
+    case "tq_priority":
+      return readTqPendingHints();
     default:
       return [];
   }

@@ -12,6 +12,7 @@
 import fs from "fs";
 import path from "path";
 import { CAKE_DIR } from "../../config/constants.js";
+import { getTaskQueue } from "../../agent/taskQueue.js";
 
 // ── Shared type ───────────────────────────────────────────────────────────────
 
@@ -126,7 +127,7 @@ export function readAsyncHints(): ItemHint[] {
     return tasks
       .map((t) => ({
         id: String(t.id ?? ""),
-        preview: `${t.status}${t.description ? ` • ${String(t.description).slice(0,60)}` : ""}`,
+        preview: `${t.status}${t.description ? ` • ${String(t.description).slice(0, 60)}` : ""}`,
       }))
       .filter((h) => h.id);
   } catch {
@@ -136,11 +137,41 @@ export function readAsyncHints(): ItemHint[] {
 
 export function readAsyncPendingHints(): ItemHint[] {
   try {
-    const tasks = asyncExecutionQueue.list().filter((t) => t.status === "pending");
+    const tasks = asyncExecutionQueue
+      .list()
+      .filter((t) => t.status === "pending");
     return tasks
       .map((t) => ({
         id: String(t.id ?? ""),
-        preview: `${t.status}${t.description ? ` • ${String(t.description).slice(0,60)}` : ""}`,
+        preview: `${t.status}${t.description ? ` • ${String(t.description).slice(0, 60)}` : ""}`,
+      }))
+      .filter((h) => h.id);
+  } catch {
+    return [];
+  }
+}
+
+export function readTqHints(): ItemHint[] {
+  try {
+    const tasks = getTaskQueue().list();
+    return tasks
+      .map((t) => ({
+        id: t.id,
+        preview: `${t.status} [${t.priority}] • ${String(t.description).slice(0, 55)}`,
+      }))
+      .filter((h) => h.id);
+  } catch {
+    return [];
+  }
+}
+
+export function readTqPendingHints(): ItemHint[] {
+  try {
+    const tasks = getTaskQueue().list(["pending", "paused"]);
+    return tasks
+      .map((t) => ({
+        id: t.id,
+        preview: `${t.status} [${t.priority}] • ${String(t.description).slice(0, 55)}`,
       }))
       .filter((h) => h.id);
   } catch {

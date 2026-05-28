@@ -53,6 +53,12 @@ const REMOVE_COMMANDS = new Set([
   "calendar_remove",
   "async_status",
   "async_cancel",
+  "tq_status",
+  "tq_cancel",
+  "tq_pause",
+  "tq_resume",
+  "tq_retry",
+  "tq_priority",
 ]);
 
 function detectRemoveSlot(words: string[]): RemoveCommand {

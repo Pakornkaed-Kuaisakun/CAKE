@@ -53,6 +53,15 @@ export const COMMANDS: CommandSuggestion[] = [
     command:
       "email_send to <email> subject <subject> [body <body>] [attach <path>]",
     description: "Send a new email with optional attachment",
+    parameters: [
+      [],
+      [],
+      ["subject"],
+      [],
+      ["body", "attach"],
+      [],
+      ["body", "attach"],
+    ],
   },
   { command: "news", description: "Fetch top 5 news from each RSS feed" },
   {
@@ -469,22 +478,28 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Test which skills activate",
   },
   {
-    command: "deep_search <topic>",
+    command: "deep_search <topic> [--export]",
     description:
-      "Multi-angle web research with AI synthesis into a full report",
-  },
-  {
-    command: "deep_search <topic> --export",
-    description: "Research and auto-save report to reports/ folder",
+      "Multi-angle web research with AI synthesis into a full report (can uto-save report to reports/ folder)",
+    parameters: [[], ["--export"]],
   },
   {
     command:
       "tq_add <description> [--priority critical|high|medium|low] [--retries N] [--timeout Ns]",
     description: "Add a task to the priority queue",
+    parameters: [
+      [],
+      ["--priority"],
+      ["critical", "high", "medium", "low"],
+      ["--retries"],
+      [],
+      ["--timeout"],
+    ],
   },
   {
     command: "tq_list [--status pending|running|completed|failed]",
     description: "List tasks in the queue",
+    parameters: [["--status"], ["pending", "running", "completed", "failed"]],
   },
   {
     command: "tq_status <id>",
@@ -504,8 +519,9 @@ export const COMMANDS: CommandSuggestion[] = [
     description: "Re-enqueue a failed or cancelled task",
   },
   {
-    command: "tq_priority <id> critical|high|medium|low",
+    command: "tq_priority <id> [critical|high|medium|low]",
     description: "Change scheduling priority of a pending task",
+    parameters: [[], ["critical", "high", "medium", "low"]],
   },
   {
     command: "tq_purge",

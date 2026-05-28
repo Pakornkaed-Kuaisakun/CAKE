@@ -79,7 +79,6 @@ const UNCACHEABLE_INTENTS = new Set([
   "calendar_list",
   "todo_list",
   "cron_list",
-  "finance",
   "bash",
   "auto",
   "agent",
