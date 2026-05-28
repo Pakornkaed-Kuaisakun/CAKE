@@ -373,6 +373,22 @@ export const ROUTES: Route[] = [
   { patterns: [/^mcp_prompts\b/i], handler: H.handleMcpPrompts },
   { patterns: [/^mcp\b/i], handler: H.handleMcp },
 
+  // Task Queue
+  { patterns: [/^tq_add\b/i, /^tq add\b/i], handler: H.handleTqAdd },
+  { patterns: [/^tq_list\b/i, /^tq list\b/i], handler: H.handleTqList },
+  { patterns: [/^tq_status\b/i, /^tq status\b/i], handler: H.handleTqStatus },
+  { patterns: [/^tq_cancel\b/i, /^tq cancel\b/i], handler: H.handleTqCancel },
+  { patterns: [/^tq_pause\b/i, /^tq pause\b/i], handler: H.handleTqPause },
+  { patterns: [/^tq_resume\b/i, /^tq resume\b/i], handler: H.handleTqResume },
+  { patterns: [/^tq_retry\b/i, /^tq retry\b/i], handler: H.handleTqRetry },
+  {
+    patterns: [/^tq_priority\b/i, /^tq priority\b/i],
+    handler: H.handleTqPriority,
+  },
+  { patterns: [/^tq_purge\b/i], handler: H.handleTqPurge },
+  { patterns: [/^tq_stats\b/i], handler: H.handleTqStats },
+  { patterns: [/^tq_drain\b/i], handler: H.handleTqDrain },
+
   // Deep search — before generic search so it takes priority
   {
     patterns: [

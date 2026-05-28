@@ -126,7 +126,8 @@ export const AGENT_TOOLS: AgentTool[] = [
   },
   {
     name: "async_status",
-    description: "Show status and recent output for a background task. | async_status <id>",
+    description:
+      "Show status and recent output for a background task. | async_status <id>",
     example: "async_status 3f8a9f...",
   },
   {
@@ -171,7 +172,8 @@ export const AGENT_TOOLS: AgentTool[] = [
       "Format: chat_export <format> <filename>|<prompt describing what to write>. " +
       "The AI writes the full content from the prompt and saves it — you do NOT need to include the content inline. " +
       "PREFER this tool over the two-step chat→export pattern.",
-    example: "chat_export md ukraine_war.md|Write a comprehensive report on the Ukraine-Russia war covering its origins, key events, humanitarian impact, and current status",
+    example:
+      "chat_export md ukraine_war.md|Write a comprehensive report on the Ukraine-Russia war covering its origins, key events, humanitarian impact, and current status",
   },
   {
     name: "mcp",
@@ -196,7 +198,8 @@ export const AGENT_TOOLS: AgentTool[] = [
   },
   {
     name: "mcp_add",
-    description: "Add a new MCP server (template or explicit). | mcp_add <template|name ...>",
+    description:
+      "Add a new MCP server (template or explicit). | mcp_add <template|name ...>",
     example: "mcp_add filesystem",
   },
   {
@@ -206,12 +209,14 @@ export const AGENT_TOOLS: AgentTool[] = [
   },
   {
     name: "mcp_tools",
-    description: "List available MCP tools (optionally filter by server). | mcp_tools [server]",
+    description:
+      "List available MCP tools (optionally filter by server). | mcp_tools [server]",
     example: "mcp_tools",
   },
   {
     name: "mcp_call",
-    description: "Call an MCP tool directly. | mcp_call <tool-name> [json-args]",
+    description:
+      "Call an MCP tool directly. | mcp_call <tool-name> [json-args]",
     example: 'mcp_call read_file {"path":"./README.md"}',
   },
   {
@@ -228,6 +233,33 @@ export const AGENT_TOOLS: AgentTool[] = [
     name: "mcp_prompts",
     description: "List prompts exposed by MCP servers. | mcp_prompts [server]",
     example: "mcp_prompts",
+  },
+  {
+    name: "tq_add",
+    description:
+      "Add a task to the priority queue and get its ID. | tq_add <description> [--priority high] [--retries 2]",
+    example: "tq_add Sync database --priority high --retries 2",
+  },
+  {
+    name: "tq_list",
+    description:
+      "List all queued tasks. | tq_list [--status pending|running|completed|failed]",
+    example: "tq_list",
+  },
+  {
+    name: "tq_status",
+    description: "Check status of a specific task. | tq_status <id>",
+    example: "tq_status abc12345",
+  },
+  {
+    name: "tq_cancel",
+    description: "Cancel a pending or running task. | tq_cancel <id>",
+    example: "tq_cancel abc12345",
+  },
+  {
+    name: "tq_drain",
+    description: "Wait until the queue is empty. | tq_drain",
+    example: "tq_drain",
   },
   {
     name: "finance",
@@ -373,6 +405,24 @@ export function getToolRunner(toolName: string): ToolRunner | null {
       return wrap(H.handleMcpRead);
     case "mcp_prompts":
       return wrap(H.handleMcpPrompts);
+    case "tq_add":
+      return wrap(H.handleTqAdd);
+    case "tq_list":
+      return wrap(H.handleTqList);
+    case "tq_status":
+      return wrap(H.handleTqStatus);
+    case "tq_cancel":
+      return wrap(H.handleTqCancel);
+    case "tq_pause":
+      return wrap(H.handleTqPause);
+    case "tq_resume":
+      return wrap(H.handleTqResume);
+    case "tq_retry":
+      return wrap(H.handleTqRetry);
+    case "tq_drain":
+      return wrap(H.handleTqDrain);
+    case "tq_stats":
+      return wrap(H.handleTqStats);
     case "finance":
       return wrap(H.handleFinanceReport);
     case "async":

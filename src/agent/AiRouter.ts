@@ -95,6 +95,17 @@ const VALID_INTENTS = new Set([
   "background_cancel",
   "deep_search",
   "deep_research",
+  "tq_add",
+  "tq_list",
+  "tq_status",
+  "tq_cancel",
+  "tq_pause",
+  "tq_resume",
+  "tq_retry",
+  "tq_priority",
+  "tq_purge",
+  "tq_stats",
+  "tq_drain",
 ]);
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
@@ -180,6 +191,17 @@ async_cancel      — cancel a pending background task
 background_cancel — alias for async_cancel
 deep_search       — comprehensive multi-step web research with synthesis (e.g. "deep search quantum computing")
 deep_research     — alias for deep_search
+tq_add            — add a task to the priority task queue
+tq_list           — list tasks in the queue (optionally filtered by status)
+tq_status         — show detailed status for a specific queued task
+tq_cancel         — cancel a pending or running task
+tq_pause          — pause a task or the entire queue
+tq_resume         — resume a paused task or the entire queue
+tq_retry          — re-enqueue a failed or cancelled task
+tq_priority       — change the scheduling priority of a pending task
+tq_purge          — remove completed/failed/cancelled tasks from the registry
+tq_stats          — show queue statistics and throughput
+tq_drain          — wait for all queued tasks to finish
 
 RULES:
 1. Return ONLY the intent name. No extra words, no punctuation.
@@ -228,6 +250,14 @@ EXAMPLES (input → intent):
 "deep search climate change solutions" → deep_search
 "research in depth AI regulation" → deep_search
 "deep research fusion energy" → deep_search
+"add task process invoices with high priority" → tq_add
+"show queued tasks" → tq_list
+"list pending tasks" → tq_list
+"pause task abc123" → tq_pause
+"resume the queue" → tq_resume
+"retry failed task" → tq_retry
+"queue statistics" → tq_stats
+"task queue status" → tq_stats
 
 `;
 

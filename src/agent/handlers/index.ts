@@ -24,3 +24,4 @@ export * from "./vectordb.js";
 export * from "./locker.js";
 export * from "./mcp.js";
 export * from "./deepSearch.js";
+export * from "./taskQueue.js";

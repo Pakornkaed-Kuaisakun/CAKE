@@ -477,5 +477,41 @@ export const COMMANDS: CommandSuggestion[] = [
     command: "deep_search <topic> --export",
     description: "Research and auto-save report to reports/ folder",
   },
+  {
+    command:
+      "tq_add <description> [--priority critical|high|medium|low] [--retries N] [--timeout Ns]",
+    description: "Add a task to the priority queue",
+  },
+  {
+    command: "tq_list [--status pending|running|completed|failed]",
+    description: "List tasks in the queue",
+  },
+  {
+    command: "tq_status <id>",
+    description: "Show detailed status for a queued task",
+  },
+  {
+    command: "tq_cancel <id>",
+    description: "Cancel a pending or running task",
+  },
+  {
+    command: "tq_pause [<id>]",
+    description: "Pause a task or the entire queue",
+  },
+  { command: "tq_resume [<id>]", description: "Resume a paused task or queue" },
+  {
+    command: "tq_retry <id>",
+    description: "Re-enqueue a failed or cancelled task",
+  },
+  {
+    command: "tq_priority <id> critical|high|medium|low",
+    description: "Change scheduling priority of a pending task",
+  },
+  {
+    command: "tq_purge",
+    description: "Remove completed/failed/cancelled tasks from registry",
+  },
+  { command: "tq_stats", description: "Show queue statistics" },
+  { command: "tq_drain", description: "Wait for all queued tasks to finish" },
   ...HALLUCINATION_COMMANDS,
 ];

@@ -152,6 +152,19 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
   mcp_resources: H.handleMcpResources,
   mcp_read: H.handleMcpRead,
   mcp_prompts: H.handleMcpPrompts,
+
+  // ── Task Queue ─────────────────────────────────────────────────────────────
+  tq_add: H.handleTqAdd,
+  tq_list: H.handleTqList,
+  tq_status: H.handleTqStatus,
+  tq_cancel: H.handleTqCancel,
+  tq_pause: H.handleTqPause,
+  tq_resume: H.handleTqResume,
+  tq_retry: H.handleTqRetry,
+  tq_priority: H.handleTqPriority,
+  tq_purge: H.handleTqPurge,
+  tq_stats: H.handleTqStats,
+  tq_drain: H.handleTqDrain,
 };
 
 /**

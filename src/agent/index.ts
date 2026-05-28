@@ -80,12 +80,16 @@ const UNCACHEABLE_INTENTS = new Set([
   "todo_list",
   "cron_list",
   "finance",
-  "search",
   "bash",
   "auto",
   "agent",
   "autonomous",
   "plugins",
+  "tq_add",
+  "tq_list",
+  "tq_status",
+  "tq_drain",
+  "tq_stats",
 ]);
 
 // Intents that skip hallucination checks (tool outputs, not LLM-generated text)
@@ -127,6 +131,17 @@ const SKIP_HALLUCINATION_INTENTS = new Set([
   "vdb_create",
   "vdb_drop",
   "vdb_clear",
+  "tq_add",
+  "tq_list",
+  "tq_status",
+  "tq_cancel",
+  "tq_pause",
+  "tq_resume",
+  "tq_retry",
+  "tq_priority",
+  "tq_purge",
+  "tq_stats",
+  "tq_drain",
   "weather", // delegated to API
 ]);
 

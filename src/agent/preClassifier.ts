@@ -132,6 +132,17 @@ const TOOL_PREFIXES = new Set([
   "mcp_prompts",
   "deep_search",
   "deep_research",
+  "tq_add",
+  "tq_list",
+  "tq_status",
+  "tq_cancel",
+  "tq_pause",
+  "tq_resume",
+  "tq_retry",
+  "tq_priority",
+  "tq_purge",
+  "tq_stats",
+  "tq_drain",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────
