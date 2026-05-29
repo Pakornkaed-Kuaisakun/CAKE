@@ -4,7 +4,7 @@
 // be resolved by the zero-latency pre-classifier or the regex route table.
 //
 // Design goals:
-//   • Deterministic  → temperature 0, maxTokens 20 (longest intent is 14 chars)
+//   • Deterministic  → temperature 0, maxTokens 30 (covers current intent names)
 //   • Compact prompt → cheaper, faster, less hallucination
 //   • Few-shot       → prevents the model from writing explanations
 //   • Validated      → strips stray whitespace/punctuation from reply
@@ -107,6 +107,13 @@ const VALID_INTENTS = new Set([
   "tq_stats",
   "tq_drain",
 ]);
+
+function resolveIntent(raw: string): string {
+  if (VALID_INTENTS.has(raw)) return raw;
+
+  const matches = [...VALID_INTENTS].filter((intent) => intent.startsWith(raw));
+  return matches.length === 1 ? matches[0] : "chat";
+}
 
 // ── Prompt (few-shot, compact) ────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are an intent classifier for a CLI assistant.
@@ -279,9 +286,9 @@ export async function aiIntentRouter(
       model: fastModel,
       systemPrompt: SYSTEM_PROMPT,
       temperature: 0,
-      // BUG FIX: was 12, but longest intent name is "todo_remove_all" = 14 chars.
-      // Raised to 20 to guarantee no truncation for any current or future intent.
-      maxTokens: 20,
+      // Keep enough room for the longest current intent plus provider-specific
+      // tokenization overhead and harmless trailing whitespace.
+      maxTokens: 30,
     },
   );
 
@@ -289,10 +296,10 @@ export async function aiIntentRouter(
   const raw = result.text
     .trim()
     .toLowerCase()
-    .replace(/[^a-z_]/g, "") // keep only letters and underscores
+    .replace(/[^a-z0-9_]/g, "") // keep intent-safe characters
     .trim();
 
-  const intent = VALID_INTENTS.has(raw) ? raw : "chat";
+  const intent = resolveIntent(raw);
 
   // ── 4) Cache the result (non-chat only) ──────────────────────────────────────
   setCachedIntent(input, intent);

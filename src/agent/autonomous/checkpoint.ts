@@ -17,18 +17,27 @@ export class CheckpointManager {
 
   constructor(dir = path.join(CAKE_DIR, 'checkpoints')) {
     this.dir = dir;
-    fs.mkdirSync(dir, { recursive: true });
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch {
+      // Checkpoints are best-effort; autonomous execution should still work.
+    }
   }
 
   save(checkpoint: ExecutionCheckpoint): void {
-    const file = path.join(this.dir, `${checkpoint.goalId}.json`);
-    fs.writeFileSync(file, JSON.stringify(checkpoint, null, 2));
+    try {
+      fs.mkdirSync(this.dir, { recursive: true });
+      const file = path.join(this.dir, `${checkpoint.goalId}.json`);
+      fs.writeFileSync(file, JSON.stringify(checkpoint, null, 2));
+    } catch {
+      // Non-fatal: losing resume data is better than failing the user goal.
+    }
   }
 
   load(goalId: string): ExecutionCheckpoint | null {
     const file = path.join(this.dir, `${goalId}.json`);
-    if (!fs.existsSync(file)) return null;
     try {
+      if (!fs.existsSync(file)) return null;
       return JSON.parse(fs.readFileSync(file, 'utf-8'));
     } catch {
       return null;

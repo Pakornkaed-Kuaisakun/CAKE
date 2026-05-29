@@ -22,9 +22,20 @@ interface AsyncTaskInternal extends AsyncTaskRecord {
   executor: () => Promise<string>;
 }
 
+export interface AsyncExecutionQueueOptions {
+  taskTimeoutMs?: number;
+}
+
+const DEFAULT_TASK_TIMEOUT_MS = 120_000;
+
 export class AsyncExecutionQueue {
   private tasks: AsyncTaskInternal[] = [];
   private processing = false;
+  private taskTimeoutMs: number;
+
+  constructor(options: AsyncExecutionQueueOptions = {}) {
+    this.taskTimeoutMs = options.taskTimeoutMs ?? DEFAULT_TASK_TIMEOUT_MS;
+  }
 
   enqueue(description: string, executor: () => Promise<string>): string {
     const id = crypto.randomUUID();
@@ -61,26 +72,42 @@ export class AsyncExecutionQueue {
     if (this.processing) return;
     this.processing = true;
 
-    while (true) {
-      const next = this.tasks.find((t) => t.status === "pending");
-      if (!next) break;
+    try {
+      while (true) {
+        const next = this.tasks.find((t) => t.status === "pending");
+        if (!next) break;
 
-      next.status = "running";
-      next.startedAt = Date.now();
+        next.status = "running";
+        next.startedAt = Date.now();
 
-      try {
-        const result = await next.executor();
-        next.result = result;
-        next.status = "completed";
-      } catch (err: any) {
-        next.error = err?.message ?? String(err);
-        next.status = "failed";
-      } finally {
-        next.completedAt = Date.now();
+        try {
+          const result = await this.runWithTimeout(next.executor);
+          next.result = result;
+          next.status = "completed";
+        } catch (err: any) {
+          next.error = err?.message ?? String(err);
+          next.status = "failed";
+        } finally {
+          next.completedAt = Date.now();
+        }
       }
+    } finally {
+      this.processing = false;
     }
+  }
 
-    this.processing = false;
+  private runWithTimeout(executor: () => Promise<string>): Promise<string> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        reject(new Error("Task timeout"));
+      }, this.taskTimeoutMs);
+    });
+
+    return Promise.race([executor(), timeoutPromise]).finally(() => {
+      if (timeout) clearTimeout(timeout);
+    });
   }
 }
 

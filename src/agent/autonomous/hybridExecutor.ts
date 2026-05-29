@@ -26,6 +26,6 @@ export async function executeHybridAutonomous(
   return executeAutonomous(provider, goal, {
     ...options,
     model: plannerModel, // planner uses fast model by default
-    // Individual tools can opt into workerModel when they need reasoning
+    workerModel,
   });
 }

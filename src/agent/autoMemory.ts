@@ -38,6 +38,10 @@ export interface AutoMemoryConfig {
   autoEpisode: boolean;
   /** Auto-end episode after N turns of inactivity on topic */
   episodeInactivityTurns: number;
+  /** Custom storage directory for memory files */
+  storageDir?: string;
+  /** Maximum time to let one background turn block the queue */
+  processingTimeoutMs: number;
 }
 
 export const DEFAULT_AUTO_MEMORY_CONFIG: AutoMemoryConfig = {
@@ -48,6 +52,7 @@ export const DEFAULT_AUTO_MEMORY_CONFIG: AutoMemoryConfig = {
   memoryConfidence: 0.55,
   autoEpisode: true,
   episodeInactivityTurns: 10,
+  processingTimeoutMs: 30_000,
 };
 
 // ── Extraction result types ───────────────────────────────────────────────────
@@ -180,19 +185,19 @@ export class AutoMemoryManager {
   private turnCount = 0;
   private currentTopicTurns = 0;
   private lastEpisodeId: string | null = null;
-  private processingTurn = false;
+  private processingPromise: Promise<any> = Promise.resolve();
 
   constructor(provider: AIProvider, config: Partial<AutoMemoryConfig> = {}) {
     this.provider = provider;
-    this.memory = new MemoryManager(provider);
-    this.episodeStore = new EpisodeStore();
-    this.decisionStore = new DecisionStore();
     this.config = { ...DEFAULT_AUTO_MEMORY_CONFIG, ...config };
+    this.memory = new MemoryManager(provider, this.config.storageDir);
+    this.episodeStore = new EpisodeStore(this.config.storageDir);
+    this.decisionStore = new DecisionStore(this.config.storageDir);
   }
 
   setProvider(provider: AIProvider): void {
     this.provider = provider;
-    this.memory = new MemoryManager(provider);
+    this.memory = new MemoryManager(provider, this.config.storageDir);
   }
 
   /**
@@ -209,17 +214,33 @@ export class AutoMemoryManager {
       return;
     }
 
-    // Prevent concurrent processing
-    if (this.processingTurn) return;
+    // Queue processing sequentially so rapid back-to-back turns are processed in order
+    this.processingPromise = this.processingPromise
+      .then(() => this._processWithTimeout(userInput, assistantResponse))
+      .catch((err) => {
+        if (process.env.DEBUG) {
+          console.warn("[AutoMemory] processing error:", err?.message ?? err);
+        }
+      });
+  }
 
-    this.turnCount++;
-    this.currentTopicTurns++;
+  private _processWithTimeout(
+    userInput: string,
+    assistantResponse: string,
+  ): Promise<void> {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
-    // Fire-and-forget — never blocks the main path
-    this._processAsync(userInput, assistantResponse).catch((err) => {
-      if (process.env.DEBUG) {
-        console.warn("[AutoMemory] processing error:", err?.message ?? err);
-      }
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeout = setTimeout(() => {
+        reject(new Error("AutoMemory turn processing timed out"));
+      }, this.config.processingTimeoutMs);
+    });
+
+    return Promise.race([
+      this._processAsync(userInput, assistantResponse),
+      timeoutPromise,
+    ]).finally(() => {
+      if (timeout) clearTimeout(timeout);
     });
   }
 
@@ -230,40 +251,40 @@ export class AutoMemoryManager {
     userInput: string,
     assistantResponse: string,
   ): Promise<void> {
-    this.processingTurn = true;
-    try {
-      // 1. Fast keyword pre-filter to decide if LLM extraction is worth it
-      const needsExtraction =
-        hasAnySignal(userInput, DECISION_SIGNALS) ||
-        hasAnySignal(userInput, FACT_SIGNALS) ||
-        hasAnySignal(userInput, EPISODE_START_SIGNALS) ||
-        hasAnySignal(assistantResponse, DECISION_SIGNALS) ||
-        userInput.length > 100; // longer inputs always worth checking
+    this.turnCount++;
+    this.currentTopicTurns++;
 
-      if (!needsExtraction) {
-        // Still do background memory write for conversational continuity
-        await this._rememberConversation(userInput, assistantResponse);
-        return;
-      }
+    // 1. Fast keyword pre-filter to decide if LLM extraction is worth it
+    const needsExtraction =
+      hasAnySignal(userInput, DECISION_SIGNALS) ||
+      hasAnySignal(userInput, FACT_SIGNALS) ||
+      hasAnySignal(userInput, EPISODE_START_SIGNALS) ||
+      hasAnySignal(assistantResponse, DECISION_SIGNALS) ||
+      userInput.length > 100; // longer inputs always worth checking
 
-      // 2. Single LLM call to extract everything at once
-      const extracted = await this._extract(userInput, assistantResponse);
-      if (!extracted) return;
+    if (!needsExtraction) {
+      // Still do background memory write for conversational continuity
+      await this._rememberConversation(userInput, assistantResponse, this.lastEpisodeId);
+      return;
+    }
 
-      // 3. Run all memory operations in parallel
-      await Promise.allSettled([
-        this._handleDecision(extracted),
-        this._handleFact(extracted, userInput),
-        this._handleEpisode(extracted, userInput),
-        this._rememberConversation(userInput, assistantResponse),
-      ]);
+    // 2. Single LLM call to extract everything at once
+    const extracted = await this._extract(userInput, assistantResponse);
+    if (!extracted) return;
 
-      // 4. Periodic self-reflection (every N turns)
-      if (this.turnCount % this.config.reflectionInterval === 0) {
-        this._runReflection();
-      }
-    } finally {
-      this.processingTurn = false;
+    // 3. Run episode handling first so we have the correct episode ID for this turn
+    const episodeId = await this._handleEpisode(extracted, userInput);
+
+    // 4. Run other memory operations in parallel
+    await Promise.allSettled([
+      this._handleDecision(extracted, episodeId),
+      this._handleFact(extracted, userInput),
+      this._rememberConversation(userInput, assistantResponse, episodeId),
+    ]);
+
+    // 5. Periodic self-reflection (every N turns)
+    if (this.turnCount % this.config.reflectionInterval === 0) {
+      this._runReflection();
     }
   }
 
@@ -296,7 +317,10 @@ export class AutoMemoryManager {
   }
 
   /** Auto-record decisions */
-  private async _handleDecision(extracted: AutoExtractResult): Promise<void> {
+  private async _handleDecision(
+    extracted: AutoExtractResult,
+    episodeId: string | null,
+  ): Promise<void> {
     if (
       !extracted.hasDecision ||
       !extracted.decision ||
@@ -304,8 +328,6 @@ export class AutoMemoryManager {
     ) {
       return;
     }
-
-    const activeEpisode = this.episodeStore.getActiveEpisode();
 
     // Link to memory entries
     let linkedMemoryIds: string[] = [];
@@ -317,7 +339,7 @@ export class AutoMemoryManager {
     this.decisionStore.addDecision(
       extracted.decision,
       extracted.rationale ?? undefined,
-      this.lastEpisodeId ?? activeEpisode?.id,
+      episodeId ?? undefined,
       {
         recordedBy: "auto",
         linkedMemoryIds,
@@ -361,11 +383,11 @@ export class AutoMemoryManager {
   }
 
   /** Auto-manage episodes */
-  private _handleEpisode(
+  private async _handleEpisode(
     extracted: AutoExtractResult,
     userInput: string,
-  ): void {
-    if (!this.config.autoEpisode) return;
+  ): Promise<string | null> {
+    if (!this.config.autoEpisode) return this.lastEpisodeId;
 
     // Start a new episode if suggested
     if (extracted.suggestEpisodeTitle && !this.lastEpisodeId) {
@@ -384,8 +406,10 @@ export class AutoMemoryManager {
           `[AutoMemory] Episode started: "${extracted.suggestEpisodeTitle}"`,
         );
       }
-      return;
+      return episode.id;
     }
+
+    const currentId = this.lastEpisodeId;
 
     // Auto-end episode if topic concluded or inactive too long
     const shouldEnd =
@@ -403,12 +427,15 @@ export class AutoMemoryManager {
       this.lastEpisodeId = null;
       this.currentTopicTurns = 0;
     }
+
+    return currentId;
   }
 
   /** Always remember conversation context (lightweight) */
   private async _rememberConversation(
     userInput: string,
     assistantResponse: string,
+    episodeId: string | null,
   ): Promise<void> {
     // Only index if there's substantive content
     if (userInput.length < 30 || assistantResponse.length < 50) return;
@@ -418,7 +445,7 @@ export class AutoMemoryManager {
     await this.memory.remember(summary, {
       source: "conversation",
       timestamp: Date.now(),
-      episodeId: this.lastEpisodeId ?? undefined,
+      episodeId: episodeId ?? undefined,
     });
   }
 

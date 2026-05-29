@@ -43,3 +43,7 @@ ggml-base.en.bin
 # Prompt / Temporary
 # =========================================================
 .prompt
+
+Microsoft/
+/test
+/test

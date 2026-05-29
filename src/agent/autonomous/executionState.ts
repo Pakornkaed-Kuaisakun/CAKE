@@ -1,39 +1,55 @@
 // src/agent/autonomous/executionState.ts
+//
+// Changes from original:
+//
+// FIX 3 — Context compression: WINDOW_SIZE reduced to 2 (from 3).
+//   Full output is only preserved for FULL_OUTPUT_TOOLS and only the
+//   immediately-prior step gets it in the planner message (enforced in planner.ts).
+//   Older steps are summarised to ≤120 chars regardless of tool type.
+//
+// FIX 4 — Failure tracking: StepRecord now includes failureCategory so the
+//   planner can reason about retry vs replan without re-parsing output.
+
 import { compressToolOutput } from "../toolOutputCompresser.js";
+import type { FailureCategory } from "./planner.js";
 
 export interface StepRecord {
   step: number;
   tool: string;
   inputPreview: string; // first 80 chars only
-  outputSummary: string; // compressed, max 120 chars — used for planner context
+  outputSummary: string; // compressed, max 120 chars — planner context (older steps)
   /**
-   * BUG FIX: fullOutput stores the COMPLETE raw output for tools whose
-   * result will be consumed by a subsequent step (e.g. "chat" → "export").
-   * Without this, the planner only sees the compressed summary and writes
-   * that truncated string into the export file instead of the real content.
+   * Full raw output for the immediately-prior step only.
+   * Tools in FULL_OUTPUT_TOOLS get this preserved so the planner can pass
+   * content downstream. The planner ONLY uses this for the last step in the
+   * window (see planner.ts buildPlannerMessage).
    */
   fullOutput?: string;
   success: boolean;
+  /** FIX 4: Categorised failure type for smarter retry decisions */
+  failureCategory?: FailureCategory;
 }
 
 export interface ExecutionState {
   goal: string;
   completedSteps: StepRecord[];
-  /** Rolling summary, regenerated every SUMMARY_INTERVAL steps */
+  /** Rolling summary regenerated every SUMMARY_INTERVAL steps */
   progressSummary: string;
   /** Only the last WINDOW_SIZE steps kept verbatim */
   recentSteps: StepRecord[];
-  failedTools: Set<string>; // for anti-repeat guidance
+  failedTools: Set<string>;
 }
 
-export const SUMMARY_INTERVAL = 5; // regenerate summary every 5 steps
-export const WINDOW_SIZE = 3; // keep last 3 steps verbatim
+export const SUMMARY_INTERVAL = 5;
+
+// FIX 3: Reduced from 3 → 2. The planner only needs one recent step with
+// full output; a second step with summary is enough for context continuity.
+export const WINDOW_SIZE = 2;
 
 /**
- * Tools whose full output must be preserved in recentSteps so that a
- * subsequent "export" step can embed the real content into the file.
- * Without this list, compressToolOutput truncates to 120 chars and the
- * agent writes that truncated summary into the exported file.
+ * Tools whose full output must be preserved so a subsequent step can use the
+ * actual content (e.g. export step embedding a chat result).
+ * Non-listed tools only get their 120-char summary stored.
  */
 const FULL_OUTPUT_TOOLS = new Set([
   "chat",
@@ -63,15 +79,19 @@ export function recordStep(
     tool,
     inputPreview: input.slice(0, 80),
     outputSummary: buildOutputSummary(tool, rawOutput),
-    // BUG FIX: preserve full output for content-producing tools
+    // Preserve full output for content-producing tools
     fullOutput: FULL_OUTPUT_TOOLS.has(tool) ? rawOutput : undefined,
     success,
+    // FIX 4: Attach failure category immediately so it's available to the planner
+    failureCategory: success
+      ? undefined
+      : categoriseFailureSync(tool, rawOutput),
   };
 
   state.completedSteps.push(record);
   state.recentSteps.push(record);
 
-  // Maintain sliding window
+  // Maintain sliding window — FIX 3: now size 2
   if (state.recentSteps.length > WINDOW_SIZE) {
     state.recentSteps.shift();
   }
@@ -81,14 +101,42 @@ export function recordStep(
   }
 }
 
+/**
+ * Inline failure categorisation used at record time.
+ * Mirrors the logic in planner.ts categoriseFailure() without the import
+ * (avoids circular dependency between executionState ↔ planner).
+ */
+function categoriseFailureSync(tool: string, output: string): FailureCategory {
+  const lower = output.toLowerCase();
+  if (lower.includes("queued background task") || lower.includes("task id"))
+    return "async_pending";
+  if (
+    lower.includes("timeout") ||
+    lower.includes("rate limit") ||
+    lower.includes("network") ||
+    lower.includes("503") ||
+    lower.includes("429")
+  )
+    return "transient";
+  if (
+    lower.includes("unknown tool") ||
+    lower.includes("not found") ||
+    lower.includes("invalid") ||
+    lower.includes("usage:")
+  )
+    return "permanent";
+  return "unknown";
+}
+
+// Re-export so callers can import from here without importing from planner.ts
+export type { FailureCategory };
+
 function buildOutputSummary(tool: string, output: string): string {
-  // Reuse heuristic compressor — this is for planner context display only,
-  // NOT for the actual content that gets written to files.
   const compressed = compressToolOutput(tool, output);
+  // FIX 3: Hard cap at 120 chars for summary (full output is on fullOutput field)
   return compressed.summary.slice(0, 120);
 }
 
-/** Regenerate the progress summary (called every SUMMARY_INTERVAL steps) */
 export function buildProgressSummary(state: ExecutionState): string {
   const done = state.completedSteps.filter((s) => s.success);
   const failed = state.completedSteps.filter((s) => !s.success);
@@ -104,7 +152,17 @@ export function buildProgressSummary(state: ExecutionState): string {
   return `Progress (${done.length}/${state.completedSteps.length} succeeded):\n${doneStr}${failedStr}`;
 }
 
-/** Build the planner message using compressed state */
+/**
+ * Build the planner message using compressed state.
+ *
+ * NOTE: This function is still exported for backwards compatibility with
+ * hybridExecutor.ts and any other callers. When using the new PlannerContext
+ * system (planner.ts planNextStepWithContext), this function is NOT called —
+ * the richer context builder in planner.ts is used instead.
+ *
+ * FIX 3: For the last recent step, show full output (capped at 1500 chars).
+ * For all other steps, show only the 120-char summary.
+ */
 export function buildPlannerMessage(
   state: ExecutionState,
   stepNum: number,
@@ -119,26 +177,23 @@ export function buildPlannerMessage(
 
   if (state.recentSteps.length > 0) {
     parts.push("RECENT STEPS:");
-    for (const s of state.recentSteps) {
+    for (let i = 0; i < state.recentSteps.length; i++) {
+      const s = state.recentSteps[i];
       const status = s.success ? "✓" : "✗";
+      const isLast = i === state.recentSteps.length - 1;
 
-      // BUG FIX: For content-producing tools (chat, search, etc.), show the
-      // FULL output in the planner context so the next export step can embed
-      // the real content into the file via the "|" separator.
-      //
-      // Without this, the planner only sees the 120-char summary like
-      // "#📚 Comprehensive Report (+86 more lines)" and writes THAT into
-      // the exported file instead of the actual report content.
-      //
-      // We cap at 8000 chars to stay within context limits while still
-      // giving the planner enough content to pass to export.
-      const outputForPlanner = s.fullOutput
-        ? s.fullOutput.slice(0, 8000)
-        : s.outputSummary;
+      // FIX 3: Full output only for the immediately-prior step
+      const outputForPlanner =
+        isLast && s.fullOutput ? s.fullOutput.slice(0, 1500) : s.outputSummary;
 
       parts.push(
         `${status} Step ${s.step} [${s.tool}]: ${s.inputPreview}\n   → ${outputForPlanner}`,
       );
+
+      // FIX 4: Surface failure category in legacy message format too
+      if (!s.success && s.failureCategory) {
+        parts.push(`   ⚠ Failure: ${s.failureCategory}`);
+      }
     }
   }
 
@@ -149,6 +204,5 @@ export function buildPlannerMessage(
   }
 
   parts.push(`\nWhat is step ${stepNum}?`);
-
   return parts.join("\n");
 }

@@ -25,6 +25,14 @@ export function isChatFastPath(input: string): boolean {
 }
 
 export const ROUTES: Route[] = [
+  // Autonomous Agent — explicit command prefix must win over words inside the goal.
+  // Example: "auto research diseases diagnosis..." contains "diagnosis", but the
+  // command is still autonomous, not system diagnosis.
+  {
+    patterns: [/^(run\s+)?(auto|agent|autonomous)\s+/i],
+    handler: H.handleAutonomous,
+  },
+
   // Email
   {
     patterns: [/\b(my emails|inbox|mail)\b/, /^email$/],
@@ -262,12 +270,6 @@ export const ROUTES: Route[] = [
       /^\$\s+.+/, // $ ls -la style
     ],
     handler: H.handleBash,
-  },
-
-  // Autonomous Agent
-  {
-    patterns: [/^(run\s+)?(auto|agent|autonomous)\s+/i],
-    handler: H.handleAutonomous,
   },
 
   // Plugins Management

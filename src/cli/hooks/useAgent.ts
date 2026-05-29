@@ -120,6 +120,7 @@ export function useAgent() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const streamingIdRef = useRef<string | null>(null);
+  const streamedRef = useRef(false);
 
   const [providerName, setProviderName] = useState<ProviderName>(INIT_PROVIDER);
   const [model, setModel] = useState<string | undefined>(INIT_MODEL);
@@ -778,6 +779,7 @@ export function useAgent() {
 
       const streamId = makeId();
       streamingIdRef.current = streamId;
+      streamedRef.current = false;
       setMessages((prev) => [
         ...prev,
         { id: streamId, role: "assistant", content: "" },
@@ -788,6 +790,7 @@ export function useAgent() {
         // Previously makeSpeakingOnChunk was never called here — voice was
         // entirely disconnected from the main agent.run() path.
         const baseOnChunk = (chunk: string) => {
+          if (chunk) streamedRef.current = true;
           setMessages((prev) =>
             prev.map((m) =>
               m.id === streamId ? { ...m, content: m.content + chunk } : m,
@@ -838,9 +841,8 @@ export function useAgent() {
 
         // Determine if the response was streamed (content already in message)
         // or came back as a single tool result (placeholder still empty).
-        const wasStreamed = Boolean(
-          messages.find((m) => m.id === streamId)?.content,
-        );
+        const wasStreamed = streamedRef.current;
+        streamedRef.current = false;
 
         setMessages((prev) =>
           prev.map((m) =>
@@ -872,6 +874,7 @@ export function useAgent() {
         setTaskStep(null);
         abortControllerRef.current = null;
         streamingIdRef.current = null;
+        streamedRef.current = false;
       }
     },
     [

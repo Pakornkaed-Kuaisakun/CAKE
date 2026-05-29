@@ -7,7 +7,7 @@ import {
   getPermissionLevel,
   type PermissionRequest,
   type PermissionDecision,
-  OperationCategory,
+  type OperationCategory,
 } from "../permissions/index.js";
 
 type ExportFormat = "txt" | "md" | "json" | "csv" | "html";
@@ -24,6 +24,24 @@ const FORMAT_ALIASES: Record<string, ExportFormat> = {
 };
 
 const DEFAULT_EXPORT_DIR = "reports";
+
+const VALID_OPERATION_CATEGORIES = new Set<OperationCategory>([
+  "bash",
+  "file_write",
+  "file_delete",
+  "file_edit",
+  "export",
+  "chat_export",
+  "finance",
+]);
+
+export function resolveExportPermissionCategory(
+  command: string,
+): OperationCategory {
+  return VALID_OPERATION_CATEGORIES.has(command as OperationCategory)
+    ? (command as OperationCategory)
+    : "export";
+}
 
 function resolveOutput(format: ExportFormat, argsAfterFormat: string): string {
   const raw = argsAfterFormat.trim().replace(/^["']|["']$/g, "");
@@ -141,7 +159,7 @@ export async function exportSink(
   const ask = _askHandler ?? defaultAskHandler;
   const guard = await guardOperation(
     {
-      category: _command as OperationCategory,
+      category: resolveExportPermissionCategory(_command),
       description: "Write output to file",
       detail: outPath,
     },

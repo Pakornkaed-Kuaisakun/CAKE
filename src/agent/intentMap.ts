@@ -90,6 +90,8 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
   bash: H.handleBash,
 
   // ── Autonomous Agent ───────────────────────────────────────────────────────
+  auto: H.handleAutonomous,
+  agent: H.handleAutonomous,
   autonomous: H.handleAutonomous,
 
   // ── Background / async execution

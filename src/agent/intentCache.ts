@@ -29,6 +29,15 @@ export function normalizeInput(raw: string): string {
     .trim();
 }
 
+// Semantic cache keys collapse punctuation, symbols, and underscores so
+// equivalent command-ish phrasings share the same exact cache entry.
+export function semanticKey(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 // ── Evict one expired or least-recently-used entry ───────────────────────────
 function evict(): void {
   const now = Date.now();
@@ -47,7 +56,7 @@ function evict(): void {
 
 /** Returns cached intent for this input, or null on miss/expired. */
 export function getCachedIntent(raw: string): string | null {
-  const key = normalizeInput(raw);
+  const key = semanticKey(raw);
   const entry = exactCache.get(key);
   if (!entry) return null;
   if (entry.expiresAt <= Date.now()) {
@@ -64,9 +73,7 @@ export function getCachedIntent(raw: string): string | null {
 
 /** Stores the router result in cache. */
 export function setCachedIntent(raw: string, intent: string): void {
-  const key = normalizeInput(raw);
-  // Never cache "chat" — it's the catch-all and shouldn't shadow future tool inputs
-  if (intent === "chat") return;
+  const key = semanticKey(raw);
 
   if (exactCache.size >= MAX_EXACT) evict();
 

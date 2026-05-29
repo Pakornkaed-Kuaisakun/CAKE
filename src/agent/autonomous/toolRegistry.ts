@@ -299,6 +299,14 @@ export type ToolRunner = (
   model?: string,
 ) => Promise<string>;
 
+function ensureCommandPrefix(input: string, command: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return command;
+  return trimmed.toLowerCase().startsWith(`${command.toLowerCase()} `)
+    ? trimmed
+    : `${command} ${trimmed}`;
+}
+
 /**
  * Maps tool name -> CAKE handler (returns plain string).
  *
@@ -426,13 +434,32 @@ export function getToolRunner(toolName: string): ToolRunner | null {
     case "finance":
       return wrap(H.handleFinanceReport);
     case "async":
-      return wrap(H.handleAsync);
+      return async (provider, input, model) => {
+        const res = await H.handleAsync(
+          provider,
+          ensureCommandPrefix(input, "async"),
+          model,
+        );
+        return res.text;
+      };
     case "async_list":
       return wrap(H.handleAsyncList);
     case "async_status":
-      return wrap(H.handleAsyncStatus);
+      return async (provider, input) => {
+        const res = await H.handleAsyncStatus(
+          provider,
+          ensureCommandPrefix(input, "async_status"),
+        );
+        return res.text;
+      };
     case "async_cancel":
-      return wrap(H.handleAsyncCancel);
+      return async (provider, input) => {
+        const res = await H.handleAsyncCancel(
+          provider,
+          ensureCommandPrefix(input, "async_cancel"),
+        );
+        return res.text;
+      };
     case "email":
       return wrap(H.handleEmail);
     case "email_send":
