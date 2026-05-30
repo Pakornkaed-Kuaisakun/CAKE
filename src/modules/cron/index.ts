@@ -73,7 +73,7 @@ export class CronManager {
       name,
       cronExpression: expression,
       taskDescription,
-      enabled: true
+      enabled: true,
     };
     this.jobs.push(job);
     this.save();
@@ -91,7 +91,15 @@ export class CronManager {
       task.stop();
       this.runningJobs.delete(id);
     }
-    this.jobs = this.jobs.filter(j => j.id !== id);
+    this.jobs = this.jobs.filter((j) => j.id !== id);
     this.save();
   }
+}
+
+let _cronManager: CronManager | null = null;
+export function initCronManager(cb: (job: ScheduledJob) => Promise<void>) {
+  if (_cronManager) return _cronManager;
+  _cronManager = new CronManager(cb);
+  _cronManager.startAll();
+  return _cronManager;
 }

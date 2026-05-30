@@ -2,10 +2,14 @@
 //
 // Screenshot + Vision handler
 //
-// BUG FIX: getVisionModel() and analyzeWithClaudeVision() were hardcoded to
-// "claude-opus-4-5" which is an outdated / non-standard model string.
-// Updated to use the current recommended model via a constant, matching the
-// pattern used everywhere else in the codebase.
+// BUG FIX 1: analyzeWithVision() previously passed content as JSON.stringify([imageBlock, textBlock])
+//   — a plain string — instead of the actual multimodal array. OpenAI and Gemini both require
+//   content to be an array of typed parts for vision to function. Fixed by passing the array directly.
+//
+// BUG FIX 2: getVisionModel() and analyzeWithClaudeVision() were hardcoded to
+//   "claude-opus-4-5" which is an outdated / non-standard model string.
+//   Updated to use the current recommended model via a constant, matching the
+//   pattern used everywhere else in the codebase.
 
 import { execSync } from "child_process";
 import fs from "fs";
@@ -18,7 +22,7 @@ import { text } from "../utils/text.js";
 
 const TMP_DIR = path.join(os.tmpdir(), "cake-vision");
 
-// BUG FIX: was "claude-opus-4-5" (non-existent / outdated string).
+// BUG FIX 2: was "claude-opus-4-5" (non-existent / outdated string).
 // Use the same default as ClaudeProvider.chat() for consistency.
 const CLAUDE_VISION_MODEL = "claude-sonnet-4-5";
 
@@ -130,11 +134,14 @@ async function analyzeWithVision(
     text: question,
   };
 
+  // BUG FIX 1: was JSON.stringify([imageBlock, textBlock]) — a plain string.
+  // OpenAI and Gemini require content to be an actual array of typed parts
+  // for multimodal vision to work. Removed JSON.stringify.
   const result = await provider.chat(
     [
       {
         role: "user",
-        content: JSON.stringify([imageBlock, textBlock]),
+        content: [imageBlock, textBlock] as any,
       },
     ],
     { model: visionModel },
@@ -162,7 +169,7 @@ async function analyzeWithClaudeVision(
     apiKey: process.env.ANTHROPIC_API_KEY,
   });
 
-  // BUG FIX: was hardcoded "claude-opus-4-5"; now uses caller-supplied model
+  // BUG FIX 2: was hardcoded "claude-opus-4-5"; now uses caller-supplied model
   // or falls back to the current recommended vision model constant.
   const response = await client.messages.create({
     model: model ?? CLAUDE_VISION_MODEL,
@@ -199,7 +206,7 @@ async function analyzeWithClaudeVision(
 function getVisionModel(providerName: string): string {
   switch (providerName) {
     case "claude":
-      // BUG FIX: was "claude-opus-4-5" (non-existent / outdated)
+      // BUG FIX 2: was "claude-opus-4-5" (non-existent / outdated)
       return CLAUDE_VISION_MODEL;
     case "openai":
       return "gpt-4o";

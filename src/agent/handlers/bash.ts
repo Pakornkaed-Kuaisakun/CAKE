@@ -1,5 +1,6 @@
 // src/agent/handlers/bash.ts
-import { execSync } from "child_process";
+import { exec } from "child_process";
+import { promisify } from "util";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { text } from "../utils/text.js";
 import {
@@ -9,6 +10,8 @@ import {
   type PermissionRequest,
   type PermissionDecision,
 } from "../permissions/index.js";
+
+const execAsync = promisify(exec);
 
 const BLOCKED_PATTERNS = [
   /rm\s+-rf\s+\/(?!\S)/, // rm -rf / (root wipe)
@@ -109,15 +112,20 @@ export async function handleBash(
 
   // ── Execute ─────────────────────────────────────────────────────────────────
   try {
-    const output = execSync(cmd, {
-      encoding: "utf-8",
+    const { stdout, stderr } = await execAsync(cmd, {
       timeout: 15_000,
       maxBuffer: 1024 * 1024,
       cwd: process.cwd(),
       env: process.env,
     });
-
-    const trimmed = output.trim();
+    // const output = execAsync(cmd, {
+    //   encoding: "utf-8",
+    //   timeout: 15_000,
+    //   maxBuffer: 1024 * 1024,
+    //   cwd: process.cwd(),
+    //   env: process.env,
+    // });
+    const trimmed = stdout.trim();
     const lines = trimmed.split("\n");
     const preview =
       lines.length > 200

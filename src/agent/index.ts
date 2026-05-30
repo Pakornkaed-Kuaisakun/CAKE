@@ -1,4 +1,6 @@
 // src/agent/index.ts
+import crypto from "crypto";
+import { SYSTEM_PROMPT } from "../config/constants.js";
 import type {
   AIProvider,
   TokenUsage,
@@ -370,6 +372,9 @@ export class CakeAgent {
     } catch (e) {
       // ignore episode lifecycle errors
     }
+    const promptHash = SYSTEM_PROMPT
+      ? crypto.createHash("md5").update(SYSTEM_PROMPT).digest("hex").slice(0, 8)
+      : "default";
     const cacheKey = `${this.provider.name}:${this.model ?? "default"}:${trimmed.toLowerCase()}`;
 
     // ── 0) Pipeline ───────────────────────────────────────────────────────────
@@ -617,13 +622,12 @@ export class CakeAgent {
     const complexity = classifyComplexity(input);
     const awarenessContext = this.awareness.getContextString(input);
 
-    // Detect intent for per-intent guardrails (fast path — no LLM call)
     const intentForGuardrail = this.inferIntentForGuardrail(input);
     const intentGuardrail = buildIntentGuardrailLayer(intentForGuardrail);
 
     const layers = {
       staticCore: STATIC_CORE_PROMPT,
-      profileSnapshot: buildProfileLayer(this.awareness.getSummary()),
+      profileSnapshot: awarenessContext,
       retrievedContext: buildRetrievedContextLayer(memories),
       intentGuardrail: intentGuardrail || undefined,
     };
@@ -777,6 +781,7 @@ export class CakeAgent {
       "cron",
       "finance",
       "search",
+      "deep_search",
       "notify",
     ].some((k) => input.toLowerCase().includes(k));
     if (!isLive) this.responseCache.set(key, response);
@@ -817,17 +822,17 @@ export class CakeAgent {
 
     // Use LLM to extract decisions/agreements
     const systemPrompt = `You are a precision decision-extraction system. Your job is to analyze the conversation turn and detect if a firm decision, agreement, or action item was finalized.
-If a decision or agreement was finalized, reply with a JSON object ONLY:
-{
-  "hasDecision": true,
-  "decision": "Brief, clear statement of the decision made",
-  "rationale": "Optional brief explanation of why/how this decision was reached (or null if none)"
-}
-If no firm decision, agreement, or action item was finalized, reply ONLY with:
-{
-  "hasDecision": false
-}
-Do NOT include markdown wrapping (like \`\`\`json), just raw JSON. Be conservative: only record actual agreements/resolutions.`;
+    If a decision or agreement was finalized, reply with a JSON object ONLY:
+    {
+      "hasDecision": true,
+      "decision": "Brief, clear statement of the decision made",
+      "rationale": "Optional brief explanation of why/how this decision was reached (or null if none)"
+    }
+    If no firm decision, agreement, or action item was finalized, reply ONLY with:
+    {
+      "hasDecision": false
+    }
+    Do NOT include markdown wrapping (like \`\`\`json), just raw JSON. Be conservative: only record actual agreements/resolutions.`;
 
     const userMessage = `User: ${input}\nAssistant: ${responseText}`;
     try {

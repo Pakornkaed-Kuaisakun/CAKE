@@ -52,6 +52,7 @@ export interface ExecutorOptions {
   plannerModel?: string;
   workerModel?: string;
   signal?: AbortSignal;
+  resumeFromCheckpoint?: boolean;
 }
 
 export async function executeAutonomous(
@@ -66,6 +67,7 @@ export async function executeAutonomous(
     plannerModel,
     workerModel,
     signal,
+    resumeFromCheckpoint = false,
   } = options;
 
   const resolvedPlannerModel =
@@ -73,9 +75,12 @@ export async function executeAutonomous(
   const resolvedWorkerModel =
     workerModel || model || getFullModel(provider.name);
 
-  const goalId = crypto.createHash("sha256").update(goal).digest("hex");
+  const goalId = crypto
+    .createHash("sha256")
+    .update(goal + Date().toString())
+    .digest("hex");
   const checkpointMgr = new CheckpointManager();
-  const existing = checkpointMgr.load(goalId);
+  const existing = resumeFromCheckpoint ? checkpointMgr.load(goalId) : null;
 
   // ── FIX 1: Upfront goal decomposition ─────────────────────────────────────
   // planGoal() runs ONCE before any tool calls, giving the planner a mental
@@ -106,6 +111,9 @@ export async function executeAutonomous(
     state = normalizeExecutionState(existing.state, goal);
     startStep = existing.stepNum + 1;
   } else {
+    if (!resumeFromCheckpoint) {
+      checkpointMgr.cleanup(goalId);
+    }
     state = {
       goal,
       completedSteps: [],
@@ -228,8 +236,7 @@ export async function executeAutonomous(
       ) {
         tool = "chat_export";
         input = buildChatExportInputFromInlineExport(input, goal);
-        thought =
-          `${thought} Long inline export content looked truncation-prone, so composing via chat_export instead.`;
+        thought = `${thought} Long inline export content looked truncation-prone, so composing via chat_export instead.`;
       } else {
         input = resolvedInput;
       }
@@ -372,9 +379,7 @@ function resolveExportInput(input: string, state: ExecutionState): string {
 
   const header = input.slice(0, pipeIndex + 1);
   const body = input.slice(pipeIndex + 1);
-  const placeholderMatch = body
-    .trim()
-    .match(/^\{\{step:(\d+)\.output\}\}$/i);
+  const placeholderMatch = body.trim().match(/^\{\{step:(\d+)\.output\}\}$/i);
 
   if (placeholderMatch) {
     const referencedStep = Number(placeholderMatch[1]);
@@ -442,7 +447,10 @@ function shouldDelegateInlineExportToChatExport(input: string): boolean {
   );
 }
 
-function buildChatExportInputFromInlineExport(input: string, goal: string): string {
+function buildChatExportInputFromInlineExport(
+  input: string,
+  goal: string,
+): string {
   const parsed = parseExportInput(input);
   if (!parsed) return input;
 
@@ -460,9 +468,9 @@ function buildChatExportInputFromInlineExport(input: string, goal: string): stri
   return `chat_export ${parsed.rawArgs}|${prompt}`;
 }
 
-function parseExportInput(input: string):
-  | { rawArgs: string; body: string }
-  | undefined {
+function parseExportInput(
+  input: string,
+): { rawArgs: string; body: string } | undefined {
   const withoutVerb = input.replace(/^export\s+/i, "").trim();
   const pipeIndex = withoutVerb.indexOf("|");
   if (pipeIndex === -1) return undefined;

@@ -1,5 +1,5 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
+import { STATIC_CORE_PROMPT } from "../promptAssembler.js";
 
 /**
  * handleChat handles general conversation.
@@ -14,6 +14,8 @@ export async function handleChat(
   // We just pass the whole thing to the LLM.
   const result = await provider.chat([{ role: "user", content: input }], {
     model: model,
+    systemPrompt: STATIC_CORE_PROMPT,
+    maxTokens: 4096,
   });
 
   return {

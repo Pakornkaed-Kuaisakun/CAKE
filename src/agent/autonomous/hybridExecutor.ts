@@ -17,8 +17,8 @@ export async function executeHybridAutonomous(
   options: HybridExecutorOptions = {},
 ): Promise<AutonomousResult> {
   const {
-    plannerModel = getFastModel(provider.name), // Haiku for planning
-    workerModel = options.model,                // Sonnet for work
+    plannerModel = getFastModel(provider.name) ?? options.model, // Haiku for planning
+    workerModel = options.model, // Sonnet for work
   } = options;
 
   // Planning uses fast model, execution uses full model
@@ -27,5 +27,6 @@ export async function executeHybridAutonomous(
     ...options,
     model: plannerModel, // planner uses fast model by default
     workerModel,
+    resumeFromCheckpoint: options.resumeFromCheckpoint ?? false,
   });
 }

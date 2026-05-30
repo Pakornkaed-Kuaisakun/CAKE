@@ -1,21 +1,76 @@
 // src/agent/history.ts — redesigned
 
 import { EpisodeStore } from "../modules/memory/episodes.js";
+import type { AIProvider } from "../providers/types.js";
+
 export interface HistoryMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   /** What gets sent to the LLM (compressed for tool outputs) */
   content: string;
   /** Original full content for display purposes */
   displayContent?: string;
+  /** True when this message was summarized from a longer original */
+  isSummary?: boolean;
 }
+
+// ── Concurrency limiter ───────────────────────────────────────────────────────
+//
+// Runs `tasks` with at most `limit` in flight at any time.
+// Preserves input order in the returned results array.
+//
+// WHY THIS EXISTS:
+//   compressHistory() previously used Promise.all() across every message that
+//   needed compression. With a long history (e.g. 14 messages all over 300
+//   chars) this fires 14 simultaneous LLM calls, which:
+//     1. Saturates provider rate limits and triggers 429s / queuing.
+//     2. Burns tokens on low-value system messages being re-summarized.
+//     3. Creates unpredictable latency spikes on the calling path.
+//
+//   Capping concurrency to 3 keeps throughput reasonable while staying well
+//   under typical provider rate limits (even free tiers allow ~5 RPM bursts).
+
+async function runConcurrent<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<T[]> {
+  const results: T[] = new Array(tasks.length);
+  let nextIdx = 0;
+
+  async function worker(): Promise<void> {
+    while (nextIdx < tasks.length) {
+      const idx = nextIdx++;
+      results[idx] = await tasks[idx]();
+    }
+  }
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () =>
+    worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
+
+// ── ConversationHistory ───────────────────────────────────────────────────────
 
 export class ConversationHistory {
   private messages: HistoryMessage[] = [];
   private readonly maxMessages = 20;
   /** Soft token budget — trigger compression if exceeded */
   private readonly softTokenBudget = 4000; // ~16,000 chars
+  /** Minimum chars before we bother summarizing a message */
+  private readonly summarizeThreshold = 300;
+  /**
+   * Maximum parallel LLM summarization calls.
+   * 3 is a safe default: fast enough to not block UX, low enough to avoid
+   * 429s on free-tier providers (Haiku, GPT-4o-mini, Gemini Flash).
+   */
+  private readonly summarizeConcurrency = 3;
 
-  push(role: HistoryMessage['role'], content: string, displayContent?: string): void {
+  push(
+    role: HistoryMessage["role"],
+    content: string,
+    displayContent?: string,
+  ): void {
     this.messages.push({
       role,
       content,
@@ -26,49 +81,115 @@ export class ConversationHistory {
       this.messages = this.messages.slice(-this.maxMessages);
     }
 
-    // If history is getting large, compress older entries
-    this.maybeTrimHistory();
-
     try {
       const store = new EpisodeStore();
       const active = store.getActiveEpisode();
       if (active) {
         store.appendMessage(active.id, { role, content, displayContent });
       }
-    } catch (err) {
+    } catch {
       // non-fatal — do not interrupt agent execution
-      // console.warn(`[episodes] append failed: ${err?.message ?? err}`);
     }
   }
 
-  getAll(): import('../providers/types.js').Message[] {
-    return this.messages.map(m => ({ role: m.role, content: m.content }));
+  getAll(): import("../providers/types.js").Message[] {
+    return this.messages.map((m) => ({ role: m.role, content: m.content }));
   }
 
   getAllForDisplay(): HistoryMessage[] {
     return [...this.messages];
   }
 
-  private maybeTrimHistory(): void {
-    const totalChars = this.messages.reduce((sum, m) => sum + m.content.length, 0);
+  /**
+   * Compress older messages using LLM summarization, with concurrency limiting.
+   *
+   * Summarization produces a semantically faithful condensed version of each
+   * message so the model retains accurate context when the user refers back to
+   * earlier turns — unlike hard truncation, which silently discards the tail
+   * and causes hallucinations or context inconsistency.
+   *
+   * Both `content` (sent to LLM) and `displayContent` (shown in UI) are set
+   * to the summary so the user knows the model is working from a condensed
+   * version rather than the full original.
+   *
+   * BUG FIX: Previously used Promise.all() which fired all summarization calls
+   * in parallel — with a long history this creates a burst of simultaneous LLM
+   * requests that can exhaust rate limits and cause unpredictable latency.
+   * Now uses runConcurrent() with a configurable concurrency cap (default 3).
+   *
+   * Falls back to hard truncation if an individual provider call fails.
+   */
+  async compressHistory(provider: AIProvider): Promise<void> {
+    const totalChars = this.messages.reduce(
+      (sum, m) => sum + m.content.length,
+      0,
+    );
     const estimatedTokens = totalChars / 4;
 
     if (estimatedTokens <= this.softTokenBudget) return;
 
-    // Compress messages older than the last 6 (3 turns)
     const keepFull = 6;
     const toCompress = this.messages.slice(0, -keepFull);
     const keepRecent = this.messages.slice(-keepFull);
 
-    const compressed = toCompress.map(m => ({
-      ...m,
-      // Truncate long messages aggressively
-      content: m.content.length > 300
-        ? m.content.slice(0, 300) + '…[truncated]'
-        : m.content,
-    }));
+    // Build task thunks (not started yet) so runConcurrent controls launch timing
+    const tasks = toCompress.map(
+      (m) => () => this.summarizeMessage(m, provider),
+    );
+
+    const compressed = await runConcurrent(tasks, this.summarizeConcurrency);
 
     this.messages = [...compressed, ...keepRecent];
+  }
+
+  private async summarizeMessage(
+    m: HistoryMessage,
+    provider: AIProvider,
+  ): Promise<HistoryMessage> {
+    // Skip short messages and already-summarized ones
+    if (m.content.length <= this.summarizeThreshold || m.isSummary) {
+      return m;
+    }
+
+    try {
+      const result = await provider.chat(
+        [
+          {
+            role: "user",
+            content:
+              `Summarize the following ${m.role} message in 1–3 concise sentences, ` +
+              `preserving all key facts, decisions, code snippets, and named entities. ` +
+              `Return ONLY the summary — no preamble.\n\n${m.content.slice(0, 6000)}`,
+          },
+        ],
+        {
+          // Use the fastest available model — this runs on the hot path
+          maxTokens: 200,
+          temperature: 0,
+        },
+      );
+
+      const summary = `[Summary] ${result.text.trim()}`;
+
+      return {
+        ...m,
+        content: summary,
+        displayContent: summary,
+        isSummary: true,
+      };
+    } catch {
+      // Fallback: hard truncation with an honest label so both LLM and UI
+      // see the same thing (no split-brain)
+      const fallback =
+        m.content.slice(0, this.summarizeThreshold) +
+        "…[truncated — summarization unavailable]";
+      return {
+        ...m,
+        content: fallback,
+        displayContent: fallback,
+        isSummary: true,
+      };
+    }
   }
 
   clear(): void {

@@ -15,7 +15,6 @@ export class VectorStore {
     this.load();
   }
 
-
   private load() {
     if (fs.existsSync(this.filePath)) {
       try {
@@ -46,7 +45,11 @@ export class VectorStore {
   updateEntry(id: string, data: Partial<MemoryEntry>) {
     const idx = this.entries.findIndex((e) => e.id === id);
     if (idx === -1) return false;
-    this.entries[idx] = { ...this.entries[idx], ...data, metadata: { ...this.entries[idx].metadata, ...(data.metadata ?? {}) } } as MemoryEntry;
+    this.entries[idx] = {
+      ...this.entries[idx],
+      ...data,
+      metadata: { ...this.entries[idx].metadata, ...(data.metadata ?? {}) },
+    } as MemoryEntry;
     this.save();
     return true;
   }
@@ -57,9 +60,7 @@ export class VectorStore {
       score: this.cosineSimilarity(queryEmbedding, entry.embedding),
     }));
 
-    return results
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    return results.sort((a, b) => b.score - a.score).slice(0, limit);
   }
 
   private cosineSimilarity(vecA: number[], vecB: number[]): number {
@@ -71,7 +72,8 @@ export class VectorStore {
       normA += vecA[i] * vecA[i];
       normB += vecB[i] * vecB[i];
     }
-    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    const denom = Math.sqrt(normA) * Math.sqrt(normB);
+    return denom === 0 ? 0 : dotProduct / denom;
   }
 
   clear() {

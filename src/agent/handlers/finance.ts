@@ -87,6 +87,16 @@ const STOP_WORDS = new Set([
   "OVERVIEW",
   "DETAIL",
   "DETAILS",
+  "GET",
+  "CHECK",
+  "GIVE",
+  "SHOW",
+  "TELL",
+  "USE",
+  "RUN",
+  "FIND",
+  "LIST",
+  "VIEW",
 ]);
 
 // Mapping of common company names → tickers for fuzzy matching

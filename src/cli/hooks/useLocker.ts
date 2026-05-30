@@ -39,7 +39,10 @@ const INITIAL: LockerState = {
 export interface UseLockerReturn {
   lockerState: LockerState;
   /** Call with the raw handler output text after every agent.run() */
-  detectLockerSignal(resultText: string, originalCommand: string): string | null;
+  detectLockerSignal(
+    resultText: string,
+    originalCommand: string,
+  ): string | null;
   /** Call in handleSubmit: if true, the input was consumed as a locker step */
   interceptLockerInput(
     value: string,
@@ -116,7 +119,7 @@ export function useLocker(): UseLockerReturn {
         lower === "/cancel" ||
         lower === "cancle" ||
         lower === "/cancle" ||
-        lower === "exit"
+        lower === "/exit"
       ) {
         setLockerState(INITIAL);
         if (onCancel) onCancel();
@@ -167,8 +170,7 @@ export function useLocker(): UseLockerReturn {
   }, []);
 
   const shouldMask =
-    lockerState.step === "needs_password" ||
-    lockerState.step === "needs_value";
+    lockerState.step === "needs_password" || lockerState.step === "needs_value";
 
   return {
     lockerState,
