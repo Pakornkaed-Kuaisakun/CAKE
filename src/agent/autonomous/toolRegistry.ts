@@ -279,6 +279,68 @@ export const AGENT_TOOLS: AgentTool[] = [
     example: "email_send to john@example.com subject Hello body How are you?",
   },
   {
+    name: "vdb_query",
+    description:
+      "Query a vector database collection by text. | vdb_query <collection> <query>",
+    example: "vdb_query songs Bohemian Rhapsody",
+  },
+  {
+    name: "vdb_add",
+    description:
+      "Add a document to the vector database collection. | vdb_add <collection> <document>",
+    example:
+      "vdb_add songs Bohemian Rhapsody Bohemian Rhapsody is a song by the English rock band Queen.",
+  },
+  {
+    name: "vdb_ingest",
+    description:
+      "Ingest a document into the vector database collection. | vdb_ingest <collection> <path>",
+    example: "vdb_ingest songs report.pdf",
+  },
+  {
+    name: "vdb_create",
+    description:
+      "Create a vector database collection. | vdb_create <collection>",
+    example: "vdb_create songs",
+  },
+  {
+    name: "vdb_list",
+    description: "List all vector database collections. | vdb_list",
+    example: "vdb_list",
+  },
+  {
+    name: "vdb_list",
+    description: "List specific collections. | vdb_list <collection>",
+    example: "vdb_list songs",
+  },
+  {
+    name: "vdb_info",
+    description:
+      "Get detailed information about a vector database collection. | vdb_info <collection>",
+    example: "vdb_info songs",
+  },
+  {
+    name: "vdb_delete",
+    description:
+      "Delete a document from a vector database collection. | vdb_delete <collection> <doc_id>",
+    example: "vdb_delete songs Bohemian Rhapsody",
+  },
+  {
+    name: "vdb_drop",
+    description: "Delete a vector database collection. | vdb_drop <collection>",
+    example: "vdb_drop songs",
+  },
+  {
+    name: "vdb_clear",
+    description: "Delete all collections in the vector database. | vdb_clear",
+    example: "vdb_clear",
+  },
+  {
+    name: "vdb_query",
+    description: "Query all collections in the vector database. | vdb_query",
+    example: "vdb_query",
+  },
+  {
     name: "chat",
     description:
       "Ask the AI a question or request written content. Use this for reasoning, writing reports, summarising, or answering questions. Returns the FULL complete text — never truncated. Use the full output directly as content for an export step.",
@@ -433,6 +495,24 @@ export function getToolRunner(toolName: string): ToolRunner | null {
       return wrap(H.handleTqStats);
     case "finance":
       return wrap(H.handleFinanceReport);
+    case "vdb_query":
+      return wrap(H.handleVdbQuery);
+    case "vdb_add":
+      return wrap(H.handleVdbAdd);
+    case "vdb_ingest":
+      return wrap(H.handleVdbIngest);
+    case "vdb_create":
+      return wrap(H.handleVdbCreate);
+    case "vdb_list":
+      return wrap(H.handleVdbList);
+    case "vdb_info":
+      return wrap(H.handleVdbInfo);
+    case "vdb_delete":
+      return wrap(H.handleVdbDelete);
+    case "vdb_drop":
+      return wrap(H.handleVdbDrop);
+    case "vdb_clear":
+      return wrap(H.handleVdbClear);
     case "async":
       return async (provider, input, model) => {
         const res = await H.handleAsync(
