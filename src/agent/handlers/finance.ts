@@ -87,10 +87,6 @@ const STOP_WORDS = new Set([
   "OVERVIEW",
   "DETAIL",
   "DETAILS",
-  "GET",
-  "CHECK",
-  "GIVE",
-  "SHOW",
   "TELL",
   "USE",
   "RUN",
@@ -209,7 +205,7 @@ export function extractTicker(input: string): string | null {
   const colonMatch = input.match(/\b([A-Z]{1,5}(?:\.[AB])?):/);
   if (colonMatch) return colonMatch[1];
 
-  // 3. Common company name lookup (case-insensitive)
+  // 3. Company name lookup
   const lower = input.toLowerCase();
   for (const [name, ticker] of Object.entries(COMPANY_TO_TICKER)) {
     if (lower.includes(name)) return ticker;

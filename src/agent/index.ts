@@ -372,10 +372,17 @@ export class CakeAgent {
     } catch (e) {
       // ignore episode lifecycle errors
     }
-    const promptHash = SYSTEM_PROMPT
-      ? crypto.createHash("md5").update(SYSTEM_PROMPT).digest("hex").slice(0, 8)
-      : "default";
-    const cacheKey = `${this.provider.name}:${this.model ?? "default"}:${trimmed.toLowerCase()}`;
+
+    // ── Cache key ─────────────────────────────────────────────────────────────
+    const intentForGuardrail = this.inferIntentForGuardrail(trimmed);
+    const intentGuardrail = buildIntentGuardrailLayer(intentForGuardrail);
+    const profileSummary = this.awareness.getSummary();
+    const promptHash = crypto
+      .createHash("md5")
+      .update(profileSummary + intentGuardrail)
+      .digest("hex")
+      .slice(0, 8);
+    const cacheKey = `${this.provider.name}:${this.model ?? "default"}:${promptHash}:${trimmed.toLowerCase()}`;
 
     // ── 0) Pipeline ───────────────────────────────────────────────────────────
     if (hasPipe(trimmed)) {
@@ -619,7 +626,7 @@ export class CakeAgent {
 
     this.history.push("user", input);
 
-    const complexity = classifyComplexity(input);
+    const complexity = classifyComplexity(input, this.model);
     const awarenessContext = this.awareness.getContextString(input);
 
     const intentForGuardrail = this.inferIntentForGuardrail(input);

@@ -107,7 +107,10 @@ function lengthScore(len: number): number {
   return 20; // cap at 20 for very long inputs
 }
 
-export function classifyComplexity(input: string): ComplexityScore {
+export function classifyComplexity(
+  input: string,
+  model?: string,
+): ComplexityScore {
   const trimmed = input.trim();
   const signals: string[] = [];
 
@@ -147,10 +150,11 @@ export function classifyComplexity(input: string): ComplexityScore {
 
   // DEBUG mode overrides everything
   if (process.env.CAKE_DEBUG === "true") {
+    const supportedThinking = !model?.includes("haiku");
     return {
       tier: "complex",
       maxTokens: 4096,
-      thinkingBudget: 2048,
+      thinkingBudget: supportedThinking ? 2048 : 0,
       score: 100,
       signals: ["debug-mode"],
     };
