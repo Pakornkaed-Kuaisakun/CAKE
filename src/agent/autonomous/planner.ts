@@ -112,17 +112,19 @@ Output ONLY a raw JSON object (no markdown, no explanation):
 }
 
 Rules:
-1. Keep steps coarse — combine trivial sub-tasks.
+1. Use the fewest coarse-grained steps needed.
 2. Mark dependsOn accurately to enable parallelism checks later.
 3. "finish" is always the last implied step; do NOT include it explicitly.
-4. If the goal is simple (1-2 steps), keep it simple.
-5. Prefer chat_export over the two-step chat→export pattern.
-6. To save a list into a vector database: use ONE vdb_add step with the entire list as the document text. NEVER use vdb_ingest for an in-memory list — vdb_ingest is only for files on disk.
-7. For vdb_add steps: the input must contain the actual text content to store.
-    The format is: vdb_add <collection> <the actual content>
-    Never use placeholders like {{step:N.output}} — copy the real content inline.
-    If saving a list from the conversation context, include the full list text in the input.
-8. Never use vdb_ingest when the content is already known — vdb_ingest reads from disk files only.`;
+4. Prefer chat_export over the two-step chat→export pattern.
+5. For vector DB:
+   - Use one vdb_add for known text/list content.
+   - Use vdb_ingest only for files on disk.
+   - vdb_add input must contain the actual content, never placeholders.
+6. If the goal contains inline list content after 'vdb_add', 
+    use that content directly as the document text. 
+    NEVER use a chat step to 'look up' or 'retrieve' content 
+    that is already present in the goal string.   
+`;
 
 /**
  * FIX 5: Upfront goal decomposition.
@@ -155,6 +157,20 @@ export async function planGoal(
     .filter((n) => !priorityTools.includes(n))
     .slice(0, 10);
   const toolList = [...priorityTools, ...otherTools].join(", ");
+
+  if (goal.startsWith("vdb_add ")) {
+    return {
+      steps: [
+        {
+          objective: "Store data in vector DB",
+          tool: "vdb_add",
+          dependsOn: -1,
+          allowedDuringAsync: false,
+        },
+      ],
+      successCriterion: "Data stored in vector database.",
+    };
+  }
 
   try {
     const result = await provider.chat(

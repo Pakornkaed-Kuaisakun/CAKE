@@ -252,6 +252,12 @@ export async function executeAutonomous(
 
     if (tool === "vdb_add" || tool === "vdb_ingest") {
       input = resolvePlaceholders(input, state);
+      if (input.split(" ").length < 5) {
+        const lastChatOutput = state.completedSteps
+          .filter((s) => s.tool === "chat" && s.success)
+          .at(-1)?.fullOutput;
+        if (lastChatOutput) input = `${input} ${lastChatOutput.slice(0, 500)}`;
+      }
     }
 
     const runner = getToolRunner(tool);

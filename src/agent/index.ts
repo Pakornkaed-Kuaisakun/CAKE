@@ -283,26 +283,34 @@ export class CakeAgent {
     const listItems = this.extractListItems(context);
 
     if (listItems.length > 0) {
-      // ถ้าเจอ list ให้บอก agent ชัดๆ ว่ามีกี่ items และต้องบันทึกแต่ละอัน
-      const itemsText = listItems
-        .map((item, i) => `${i + 1}. ${item}`)
-        .join("\n");
+      const safeList = listItems.join(", ").slice(0, 800);
 
-      const safeList = listItems.join(", ").slice(0, 800); // hard cap to avoid truncation
-      return `${input}
+      // เช็คว่าเป็น vdb intent จริงๆ ไหม
+      const isVdbIntent =
+        /\b(vdb|vector\s*db|vector\s*database|save.*db|store.*db)\b/i.test(
+          input,
+        );
 
-      Use exactly this command (copy verbatim):
-      vdb_add sad_songs ${safeList}
+      if (isVdbIntent) {
+        const collectionName =
+          input
+            .toLowerCase()
+            .replace(
+              /\b(save|store|add|this|list|to|the|a|an|into|vector|db|vdb)\b/gi,
+              "",
+            )
+            .trim()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "")
+            .slice(0, 30) || "my_list";
 
-      Collection name is: sad_songs (no spaces, no modification)
-      Do NOT split this into multiple vdb_add calls.`;
+        return `vdb_add ${collectionName} ${safeList}`;
+      }
+
+      // กรณีอื่น: inject context แบบเดิม แต่ไม่ hardcode collection
+      return `${input}\n\nList items:\n${safeList}`;
     }
-
-    // ถ้าไม่ใช่ list ส่ง context ธรรมดา
-    return `${input}
-
-      Context from previous response:
-      ${context}`;
+    return input;
   }
 
   shouldRetrieveMemory(inputLength: number): boolean {
