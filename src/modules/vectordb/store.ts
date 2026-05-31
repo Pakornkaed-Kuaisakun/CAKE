@@ -135,6 +135,14 @@ export function addDocument(
     }
   }
 
+  const normalizedText = text.trim().toLowerCase();
+  const duplicate = store.documents.find(
+    (d) => d.text.trim().toLowerCase() === normalizedText,
+  );
+  if (duplicate) {
+    return duplicate;
+  }
+
   const now = new Date().toISOString();
   const docId = id ?? crypto.randomUUID();
 

@@ -151,28 +151,10 @@ function hasAnySignal(text: string, signals: string[]): boolean {
 
 // ── SYSTEM PROMPT for the single extraction LLM call ─────────────────────────
 
-const EXTRACTION_SYSTEM = `You are a memory extraction engine for a personal AI assistant.
-Analyze ONE conversation turn and extract structured memory signals.
-
-Output ONLY a raw JSON object (no markdown, no explanation):
-{
-  "hasDecision": <bool>,           // A firm decision/agreement/action was reached
-  "decision": "<text or null>",    // If hasDecision: concise statement of decision
-  "rationale": "<text or null>",   // Why/how decision was made (optional)
-  "hasImportantFact": <bool>,      // Something worth remembering long-term
-  "fact": "<text or null>",        // If hasImportantFact: the fact in plain English
-  "factType": "<type or null>",    // person|project|task|preference|fact|event
-  "suggestEpisodeTitle": "<text or null>",  // Start a new episode? Give it a title. Null if not.
-  "shouldEndEpisode": <bool>,      // Current episode/topic seems concluded
-  "confidence": <0.0-1.0>         // Overall confidence in the extractions
-}
-
-Rules:
-- hasDecision: true ONLY for firm commitments, agreements, choices finalized
-- hasImportantFact: true for project names, people names, preferences, requirements, deadlines
-- suggestEpisodeTitle: suggest when user starts a substantial new topic (design, planning, building)
-- Skip trivial exchanges (greetings, acknowledgments, simple Q&A)
-- confidence: 0.9 explicit statement, 0.7 strongly implied, 0.5 weakly implied`;
+const EXTRACTION_SYSTEM = `Extract memory signals. Reply JSON only:
+{"d":false,"f":false,"dt":"<decision or null>","ft":"<fact or null>","ft_type":null,"conf":0.5}
+d=decision made, f=important fact, dt=decision text, ft=fact text, ft_type=person|project|task|preference|fact, conf=0-1
+Skip greetings. Only record firm decisions and key facts.`;
 
 // ── AutoMemoryManager ─────────────────────────────────────────────────────────
 
@@ -260,11 +242,20 @@ export class AutoMemoryManager {
       hasAnySignal(userInput, FACT_SIGNALS) ||
       hasAnySignal(userInput, EPISODE_START_SIGNALS) ||
       hasAnySignal(assistantResponse, DECISION_SIGNALS) ||
-      userInput.length > 100; // longer inputs always worth checking
+      (userInput.length > 200 &&
+        hasAnySignal(userInput, [
+          ...DECISION_SIGNALS,
+          ...FACT_SIGNALS,
+          ...EPISODE_START_SIGNALS,
+        ]));
 
     if (!needsExtraction) {
       // Still do background memory write for conversational continuity
-      await this._rememberConversation(userInput, assistantResponse, this.lastEpisodeId);
+      await this._rememberConversation(
+        userInput,
+        assistantResponse,
+        this.lastEpisodeId,
+      );
       return;
     }
 
@@ -310,7 +301,17 @@ export class AutoMemoryManager {
 
       const raw = resp.text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(raw);
-      return parsed as AutoExtractResult;
+      return {
+        hasDecision: parsed.d ?? parsed.hasDecision ?? false,
+        decision: parsed.dt ?? parsed.decision ?? null,
+        rationale: parsed.rationale ?? null,
+        hasImportantFact: parsed.f ?? parsed.hasImportantFact ?? false,
+        fact: parsed.ft ?? parsed.fact ?? null,
+        factType: parsed.ft_type ?? parsed.factType ?? null,
+        suggestEpisodeTitle: parsed.ep ?? parsed.suggestEpisodeTitle ?? null,
+        shouldEndEpisode: parsed.end ?? parsed.shouldEndEpisode ?? false,
+        confidence: parsed.conf ?? parsed.confidence ?? 0.5,
+      } as AutoExtractResult;
     } catch {
       return null;
     }
@@ -439,6 +440,11 @@ export class AutoMemoryManager {
   ): Promise<void> {
     // Only index if there's substantive content
     if (userInput.length < 30 || assistantResponse.length < 50) return;
+    if (
+      !hasAnySignal(userInput, DECISION_SIGNALS) &&
+      !hasAnySignal(userInput, FACT_SIGNALS)
+    )
+      return; // skip if no signal
 
     const summary = `User: ${userInput.slice(0, 150)}\nAssistant: ${assistantResponse.slice(0, 150)}`;
 

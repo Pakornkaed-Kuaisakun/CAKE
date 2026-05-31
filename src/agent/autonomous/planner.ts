@@ -117,9 +117,12 @@ Rules:
 3. "finish" is always the last implied step; do NOT include it explicitly.
 4. If the goal is simple (1-2 steps), keep it simple.
 5. Prefer chat_export over the two-step chat→export pattern.
-6. To save text/list into local vector database use vdb_add (single text) or vdb_ingest (file). NEVER use mcp_call for this.
-7. If the goal contains a numbered/bulleted list of items to save, create ONE vdb_add step per item using the exact item text — do NOT summarize or use placeholder text.
-8. If saving multiple items (>5), use a single bash step to call vdb_add in a loop, or use vdb_add with the full list as one document only if explicitly told to combine.`;
+6. To save a list into a vector database: use ONE vdb_add step with the entire list as the document text. NEVER use vdb_ingest for an in-memory list — vdb_ingest is only for files on disk.
+7. For vdb_add steps: the input must contain the actual text content to store.
+    The format is: vdb_add <collection> <the actual content>
+    Never use placeholders like {{step:N.output}} — copy the real content inline.
+    If saving a list from the conversation context, include the full list text in the input.
+8. Never use vdb_ingest when the content is already known — vdb_ingest reads from disk files only.`;
 
 /**
  * FIX 5: Upfront goal decomposition.
@@ -247,7 +250,7 @@ function fallbackPlan(goal: string): GoalPlan {
 
 function buildSystemPrompt(): string {
   const toolList = AGENT_TOOLS.map(
-    (t) => `  - ${t.name}: ${t.description}\n    example input: "${t.example}"`,
+    (t) => `  - ${t.name}: ${t.description.split("|")[0].trim()}`,
   ).join("\n");
 
   return `You are an autonomous AI agent. Select the NEXT single step to take.
@@ -268,7 +271,14 @@ function buildSystemPrompt(): string {
   4. async tasks: if the last step returned a task ID, your next step MUST be async_status <id> to check completion before depending on its result.
   5. Use "finish" only when successCriterion is met — include a brief summary.
   6. Do NOT repeat a failed (permanent) tool call with the same input.
-  7. For content-producing steps, prefer chat_export over separate chat→export.`;
+  7. For content-producing steps, prefer chat_export over separate chat→export.
+  8. For vdb_add: always include the actual content inline — NEVER use {{step:N.output}} placeholders. 
+   Instead, write the real content directly: vdb_add <collection> <actual text here>.
+   If the content is the output of a previous step, copy it directly into the vdb_add input.
+  9. vdb_add format is STRICT: vdb_add <collection_name> <text>
+   - collection_name must be a single word with no spaces (use underscores: sad_songs)
+   - If the text is long, summarize it to under 500 characters inline
+   - NEVER let the collection name bleed into the text content`;
 }
 
 // ── Context builder (FIX 3) ──────────────────────────────────────────────────

@@ -54,17 +54,10 @@ async function runConcurrent<T>(
 
 export class ConversationHistory {
   private messages: HistoryMessage[] = [];
-  private readonly maxMessages = 20;
-  /** Soft token budget — trigger compression if exceeded */
-  private readonly softTokenBudget = 4000; // ~16,000 chars
-  /** Minimum chars before we bother summarizing a message */
-  private readonly summarizeThreshold = 300;
-  /**
-   * Maximum parallel LLM summarization calls.
-   * 3 is a safe default: fast enough to not block UX, low enough to avoid
-   * 429s on free-tier providers (Haiku, GPT-4o-mini, Gemini Flash).
-   */
-  private readonly summarizeConcurrency = 3;
+  private readonly maxMessages = 15;
+  private readonly softTokenBudget = 3000;
+  private readonly summarizeThreshold = 600;
+  private readonly summarizeConcurrency = 2;
 
   push(
     role: HistoryMessage["role"],

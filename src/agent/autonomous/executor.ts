@@ -55,6 +55,14 @@ export interface ExecutorOptions {
   resumeFromCheckpoint?: boolean;
 }
 
+function resolvePlaceholders(input: string, state: ExecutionState): string {
+  return input.replace(/\{\{step:(\d+)\.output\}\}/gi, (match, stepNum) => {
+    const num = Number(stepNum);
+    const step = state.completedSteps.find((s) => s.step === num);
+    return step?.fullOutput ?? step?.outputSummary ?? match;
+  });
+}
+
 export async function executeAutonomous(
   provider: AIProvider,
   goal: string,
@@ -242,6 +250,10 @@ export async function executeAutonomous(
       }
     }
 
+    if (tool === "vdb_add" || tool === "vdb_ingest") {
+      input = resolvePlaceholders(input, state);
+    }
+
     const runner = getToolRunner(tool);
     let rawOutput: string;
     let stepSuccess = true;
@@ -309,7 +321,10 @@ export async function executeAutonomous(
       if (
         tool === expectedTool ||
         tool === "chat_export" ||
-        tool === "export"
+        tool === "export" ||
+        tool === "vdb_add" ||
+        tool === "vdb_ingest" ||
+        tool === "vdb_create"
       ) {
         if (currentPlanIndex < goalPlan.steps.length - 1) {
           currentPlanIndex++;

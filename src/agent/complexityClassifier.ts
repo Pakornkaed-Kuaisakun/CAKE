@@ -14,10 +14,10 @@ const TIER_CONFIG: Record<
   ComplexityTier,
   { maxTokens: number; thinkingBudget: number }
 > = {
-  trivial: { maxTokens: 256, thinkingBudget: 0 },
-  simple: { maxTokens: 512, thinkingBudget: 0 },
-  moderate: { maxTokens: 1024, thinkingBudget: 0 },
-  complex: { maxTokens: 4096, thinkingBudget: 2048 },
+  trivial: { maxTokens: 128, thinkingBudget: 0 },
+  simple: { maxTokens: 384, thinkingBudget: 0 },
+  moderate: { maxTokens: 768, thinkingBudget: 0 },
+  complex: { maxTokens: 2048, thinkingBudget: 1024 },
 };
 
 // Signals that LOWER complexity (fast-exit)

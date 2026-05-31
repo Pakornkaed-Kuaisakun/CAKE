@@ -156,6 +156,14 @@ export async function handleVdbAdd(
     );
   }
 
+  if (!/^[a-zA-Z0-9_-]+$/.test(collection)) {
+    return text(
+      `[VDB] Invalid collection name "${collection}". ` +
+        `Collection names must contain only letters, numbers, underscores, and hyphens.\n` +
+        `Did you mean: vdb_add <collection> <text>?`,
+    );
+  }
+
   const { id, usedEmbedding } = await ingestText(provider, collection, payload);
   const embeddingNote = usedEmbedding
     ? "embedded ✓"

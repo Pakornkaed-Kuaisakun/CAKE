@@ -287,14 +287,15 @@ export class CakeAgent {
       const itemsText = listItems
         .map((item, i) => `${i + 1}. ${item}`)
         .join("\n");
+
+      const safeList = listItems.join(", ").slice(0, 800); // hard cap to avoid truncation
       return `${input}
 
-      The list to save contains ${listItems.length} items. Save EACH item individually using vdb_add.
-      Collection name: my_list
-      Items to save:
-      ${itemsText}
+      Use exactly this command (copy verbatim):
+      vdb_add sad_songs ${safeList}
 
-      IMPORTANT: Call vdb_add once per item with the actual song/item name. Do NOT summarize or combine items.`;
+      Collection name is: sad_songs (no spaces, no modification)
+      Do NOT split this into multiple vdb_add calls.`;
     }
 
     // ถ้าไม่ใช่ list ส่ง context ธรรมดา
