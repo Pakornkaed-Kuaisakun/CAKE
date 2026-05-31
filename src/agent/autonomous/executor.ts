@@ -368,7 +368,7 @@ function normalizeExecutionState(
 }
 
 function isToolOutputFailure(output: string): boolean {
-  return /^(?:Tool error|Unknown tool|Usage:|Task not found|Please provide|Could not cancel)\b/i.test(
+  return /^(?:Tool error|Unknown tool|Usage:|Task not found|Please provide|Could not cancel|Please specify|\[VDB\] Failed to ingest)\b/i.test(
     output.trim(),
   );
 }

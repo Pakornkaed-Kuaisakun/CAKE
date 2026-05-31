@@ -116,7 +116,10 @@ Rules:
 2. Mark dependsOn accurately to enable parallelism checks later.
 3. "finish" is always the last implied step; do NOT include it explicitly.
 4. If the goal is simple (1-2 steps), keep it simple.
-5. Prefer chat_export over the two-step chat→export pattern.`;
+5. Prefer chat_export over the two-step chat→export pattern.
+6. To save text/list into local vector database use vdb_add (single text) or vdb_ingest (file). NEVER use mcp_call for this.
+7. If the goal contains a numbered/bulleted list of items to save, create ONE vdb_add step per item using the exact item text — do NOT summarize or use placeholder text.
+8. If saving multiple items (>5), use a single bash step to call vdb_add in a loop, or use vdb_add with the full list as one document only if explicitly told to combine.`;
 
 /**
  * FIX 5: Upfront goal decomposition.
@@ -130,9 +133,25 @@ export async function planGoal(
 ): Promise<GoalPlan> {
   const fastModel = model || getFastModel(provider.name);
 
-  const toolList = AGENT_TOOLS.slice(0, 20)
-    .map((t) => t.name)
-    .join(", ");
+  const priorityTools = [
+    "search",
+    "deep_search",
+    "chat",
+    "chat_export",
+    "export",
+    "bash",
+    "file_read",
+    "file_compose",
+    "vdb_add",
+    "vdb_ingest",
+    "vdb_create",
+    "vdb_query",
+    "vdb_list",
+  ];
+  const otherTools = AGENT_TOOLS.map((t) => t.name)
+    .filter((n) => !priorityTools.includes(n))
+    .slice(0, 10);
+  const toolList = [...priorityTools, ...otherTools].join(", ");
 
   try {
     const result = await provider.chat(
@@ -177,7 +196,10 @@ export async function planGoal(
   }
 }
 
-function normalisePlannedStep(step: PlannedStep, index: number): PlannedStep | null {
+function normalisePlannedStep(
+  step: PlannedStep,
+  index: number,
+): PlannedStep | null {
   if (!step || typeof step.objective !== "string") return null;
 
   const tool =
@@ -185,7 +207,9 @@ function normalisePlannedStep(step: PlannedStep, index: number): PlannedStep | n
       ? step.tool.toLowerCase()
       : "chat";
   const dependsOn =
-    Number.isInteger(step.dependsOn) && step.dependsOn >= -1 && step.dependsOn < index
+    Number.isInteger(step.dependsOn) &&
+    step.dependsOn >= -1 &&
+    step.dependsOn < index
       ? step.dependsOn
       : index > 0
         ? index - 1
@@ -452,9 +476,12 @@ export async function planNextStepWithContext(
   return planned;
 }
 
-function fallbackStepFromPlan(ctx: PlannerContext, rawPlannerText: string): ThoughtStep {
-  const currentStep =
-    ctx.plan.steps[ctx.currentPlanIndex] ?? ctx.plan.steps.at(-1);
+function fallbackStepFromPlan(
+  ctx: PlannerContext,
+  rawPlannerText: string,
+): ThoughtStep {
+  let planIndex = ctx.currentPlanIndex;
+  let currentStep = ctx.plan.steps[planIndex] ?? ctx.plan.steps.at(-1);
 
   if (!currentStep) {
     return {
@@ -464,8 +491,20 @@ function fallbackStepFromPlan(ctx: PlannerContext, rawPlannerText: string): Thou
     };
   }
 
-  const thought =
-    `Planner output was invalid, so following the current plan step: ${currentStep.objective}`;
+  const recentSteps = ctx.completedSteps.slice(-3);
+  const currentToolPermanentlyFailure = recentSteps.some(
+    (s) =>
+      !s.success &&
+      s.tool === currentStep!.tool &&
+      s.failureCategory === "permanent",
+  );
+
+  if (currentToolPermanentlyFailure && planIndex < ctx.plan.steps.length - 1) {
+    planIndex += 1;
+    currentStep = ctx.plan.steps[planIndex];
+  }
+
+  const thought = `Planner output was invalid, so following the current plan step: ${currentStep.objective}`;
   const tool = currentStep.tool === "finish" ? "chat" : currentStep.tool;
 
   if (tool === "chat_export") {
@@ -519,7 +558,9 @@ function buildChatExportFallbackInput(ctx: PlannerContext): string {
     `Write a complete markdown report for this goal: ${ctx.goal}`,
     "",
     `Success criterion: ${ctx.plan.successCriterion}`,
-    sourceSummaries ? `Use these completed-step notes:\n${sourceSummaries}` : "",
+    sourceSummaries
+      ? `Use these completed-step notes:\n${sourceSummaries}`
+      : "",
     "",
     "Produce a polished report from beginning to end. Include a conclusion and sources or caveats when appropriate.",
   ]

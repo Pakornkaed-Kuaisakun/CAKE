@@ -242,6 +242,68 @@ export class CakeAgent {
     this.autoMemory.resetSession();
   }
 
+  private extractListItems(text: string): string[] {
+    const lines = text.split("\n");
+    const items: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      // match: "1. Song name", "- Song name", "• Song name", "* Song name"
+      const match = trimmed.match(/^(?:\d+[\.\)]\s+|[-•*]\s+)(.+)/);
+      if (match) {
+        // ตัด markdown formatting ออก เช่น **bold** "quotes"
+        const clean = match[1]
+          .replace(/\*\*/g, "")
+          .replace(/^[""]|[""]$/g, "")
+          .trim();
+        if (clean.length > 0) items.push(clean);
+      }
+    }
+
+    return items;
+  }
+
+  private resolveConversationalReferences(input: string): string {
+    const hasReference =
+      /\b(this|it|the list|that|these|those|above|the result)\b/i.test(input);
+    if (!hasReference) return input;
+
+    const messages = this.history.getAllForDisplay();
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant" && m.content.length > 50);
+
+    if (!lastAssistant) return input;
+
+    const context = (
+      lastAssistant.displayContent ?? lastAssistant.content
+    ).slice(0, 3000);
+
+    // ตรวจว่าเป็น numbered/bulleted list ไหม
+    const listItems = this.extractListItems(context);
+
+    if (listItems.length > 0) {
+      // ถ้าเจอ list ให้บอก agent ชัดๆ ว่ามีกี่ items และต้องบันทึกแต่ละอัน
+      const itemsText = listItems
+        .map((item, i) => `${i + 1}. ${item}`)
+        .join("\n");
+      return `${input}
+
+      The list to save contains ${listItems.length} items. Save EACH item individually using vdb_add.
+      Collection name: my_list
+      Items to save:
+      ${itemsText}
+
+      IMPORTANT: Call vdb_add once per item with the actual song/item name. Do NOT summarize or combine items.`;
+    }
+
+    // ถ้าไม่ใช่ list ส่ง context ธรรมดา
+    return `${input}
+
+      Context from previous response:
+      ${context}`;
+  }
+
   shouldRetrieveMemory(inputLength: number): boolean {
     return (
       inputLength > 30 &&
@@ -554,9 +616,13 @@ export class CakeAgent {
         tool: intent,
       });
 
+      const effectiveInput = ["autonomous", "auto", "agent"].includes(intent)
+        ? this.resolveConversationalReferences(trimmed)
+        : trimmed;
+
       const rawResult = await aiHandler(
         this.provider,
-        trimmed,
+        effectiveInput,
         this.fastModel,
         opts,
       );
