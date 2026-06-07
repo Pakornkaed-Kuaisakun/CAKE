@@ -30,37 +30,11 @@ import {
   collectionExists,
   VECTORDB_DIR,
 } from "../../modules/vectordb/index.js";
-
-// ── Shared helpers ────────────────────────────────────────────────────────────
-
-/** Strip a leading intent verb from the raw input string */
-function stripVerb(input: string, verbs: string[]): string {
-  for (const v of verbs) {
-    const re = new RegExp(`^${v}\\s*`, "i");
-    if (re.test(input)) return input.replace(re, "").trim();
-  }
-  return input.trim();
-}
-
-/**
- * Parse the first "word" (collection name) out of a string.
- * Collection names cannot contain spaces; the rest is the payload.
- */
-function splitCollectionPayload(s: string): {
-  collection: string;
-  payload: string;
-} {
-  const idx = s.search(/\s/);
-  if (idx === -1) return { collection: s.trim(), payload: "" };
-  return {
-    collection: s.slice(0, idx).trim(),
-    payload: s.slice(idx + 1).trim(),
-  };
-}
-
-function formatScore(score: number): string {
-  return `${(score * 100).toFixed(1)}%`;
-}
+import {
+  stripVerb,
+  splitCollectionPayload,
+  formatScore,
+} from "../../shared/utils/utils.js";
 
 // ── vdb_query ─────────────────────────────────────────────────────────────────
 

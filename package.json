@@ -1,6 +1,6 @@
 {
   "name": "cake",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "description": "",
   "scripts": {
@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "tsx test/**/*.test.ts",
     "start": "node dist/cli/index.js",
-    "discord": "tsx src/discord/index.ts"
+    "discord": "tsx src/discord/index.ts",
+    "server": "tsx src/server/index.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.94.0",

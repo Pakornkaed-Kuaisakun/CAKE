@@ -9,7 +9,11 @@
 import type { AIProvider } from "../../providers/types.js";
 import type { StockData } from "./types.js";
 import type { EnhancedStockData } from "./enhanced.js";
-import { formatCurrency, formatLargeNumber, formatPct } from "./format.js";
+import {
+  formatCurrency,
+  formatLargeNumber,
+  formatPct,
+} from "../../shared/utils/utils.js";
 
 const SYSTEM_PROMPT = `You are a senior equity research analyst at a top-tier investment bank.
 Analyze the provided stock data and produce a concise, insightful investment brief.

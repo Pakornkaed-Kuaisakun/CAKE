@@ -13,15 +13,13 @@
 //         permanent) and chooses retry, replan, or skip accordingly.
 //
 // FIX 5: Separated Planning/Execution — planGoal() decomposes upfront;
-//         planNextStep() just selects the next move from the existing plan.
 
-import type { AIProvider } from "../../providers/types.js";
-import type { ThoughtStep } from "./types.js";
-import { AGENT_TOOLS } from "./toolRegistry.js";
+import { AIProvider } from "../../providers/types.js";
 import { getFastModel } from "../../providers/utils.js";
+import { AGENT_TOOLS } from "./toolRegistry.js";
+import { ThoughtStep } from "./types.js";
 
-// ── Types ────────────────────────────────────────────────────────────────────
-
+//         planNextStep() just selects the next move from the existing plan.
 export interface PlannedStep {
   /** Human-readable description of what this step achieves */
   objective: string;
@@ -53,6 +51,29 @@ const TOOL_NAMES = new Set(AGENT_TOOLS.map((tool) => tool.name));
 const ASYNC_TASK_ID_RE =
   /(?:queued background task|task(?:\s+id)?[:\s]+)\s*([a-f0-9-]{36})/i;
 
+// Detect if goal references previous result ("this list", "previous output", etc)
+function referencesPreviousResult(goal: string): boolean {
+  const patterns =
+    /\b(this|that|the)\s+(list|result|output|data|content|response|text)\b/i;
+  return patterns.test(goal);
+}
+
+// Extract vdb collection name from goal (e.g., "save to vector_db as movies" → "movies")
+function extractVdbCollectionName(goal: string): string | null {
+  const patterns = [
+    /vdb_add\s+(\w+)/i,
+    /(?:save|add|store)\s+(?:to|in)\s+(?:vector\s+)?db\s+(?:as|collection|named)?\s*(\w+)/i,
+    /(?:vdb|vector.*db)\s+collection\s+(\w+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = goal.match(pattern);
+    if (match) {
+      return match[1].toLowerCase().replace(/\s+/g, "_");
+    }
+  }
+  return null;
+}
 export function categoriseFailure(
   tool: string,
   output: string,
@@ -111,19 +132,25 @@ Output ONLY a raw JSON object (no markdown, no explanation):
   "successCriterion": "<one sentence: what done looks like>"
 }
 
-Rules:
-1. Use the fewest coarse-grained steps needed.
-2. Mark dependsOn accurately to enable parallelism checks later.
-3. "finish" is always the last implied step; do NOT include it explicitly.
-4. Prefer chat_export over the two-step chat→export pattern.
-5. For vector DB:
-   - Use one vdb_add for known text/list content.
+CRITICAL RULES:
+1. If a RECENT RESULTS section appears in the goal, use ONLY that content. DO NOT search for it or regenerate it.
+2. If the goal says "save this list to vector db" and RECENT RESULTS contains a list, plan:
+   - vdb_create <collection_name>
+   - vdb_add <collection_name> (the executor will inject the content from RECENT RESULTS)
+3. NEVER plan search, chat, or export steps when you have RECENT RESULTS already injected.
+4. Use the fewest coarse-grained steps needed.
+5. Mark dependsOn accurately to enable parallelism checks later.
+6. "finish" is always the last implied step; do NOT include it explicitly.
+7. Prefer chat_export over the two-step chat→export pattern (but only if you need to generate content).
+8. For vector DB:
+   - Use vdb_add for known text/list content.
    - Use vdb_ingest only for files on disk.
-   - vdb_add input must contain the actual content, never placeholders.
-6. If the goal contains inline list content after 'vdb_add', 
-    use that content directly as the document text. 
-    NEVER use a chat step to 'look up' or 'retrieve' content 
-    that is already present in the goal string.   
+   - vdb_add input format: vdb_add <collection> <text>
+9. If the goal contains "this list", "that result", "previous output", "above", "earlier", etc.:
+   - Check if a RECENT RESULTS section is present.
+   - If present: plan vdb_create + vdb_add directly (do NOT search or regenerate).
+   - If not present: you may need a preceding step to gather the content.
+10. Collection names: extract from goal (e.g., "save to movies" → use "movies"), or default to a descriptive name.
 `;
 
 /**
@@ -135,6 +162,7 @@ export async function planGoal(
   provider: AIProvider,
   goal: string,
   model?: string,
+  recentResults?: Array<{ source: string; content: string }>,
 ): Promise<GoalPlan> {
   const fastModel = model || getFastModel(provider.name);
 
@@ -173,11 +201,32 @@ export async function planGoal(
   }
 
   try {
+    // If goal references previous result and we have recent results, inject them
+    let contextualGoal = goal;
+    if (
+      referencesPreviousResult(goal) &&
+      recentResults &&
+      recentResults.length > 0
+    ) {
+      const recentContent = recentResults
+        .slice(-1)
+        .map((r) => r.content.slice(0, 1000))
+        .join("\n");
+      // Format as a clear, actionable instruction
+      contextualGoal = `${goal}
+
+IMPORTANT: The content you need to save is already available below (marked as RECENT RESULTS).
+Use it directly in your vdb_add plan. Do NOT plan search or chat steps to regenerate it.
+
+RECENT RESULTS (use this directly):
+${recentContent}`;
+    }
+
     const result = await provider.chat(
       [
         {
           role: "user",
-          content: `Goal: "${goal}"\n\nAvailable tools (partial list): ${toolList}\n\nDecompose this goal.`,
+          content: `Goal: "${contextualGoal}"\n\nAvailable tools (partial list): ${toolList}\n\nDecompose this goal.`,
         },
       ],
       {
@@ -187,7 +236,6 @@ export async function planGoal(
         maxTokens: 800,
       },
     );
-
     const raw = result.text.replace(/```json|```/g, "").trim();
     const parsed = JSON.parse(raw) as GoalPlan;
 
@@ -243,6 +291,33 @@ function normalisePlannedStep(
 }
 
 function fallbackPlan(goal: string): GoalPlan {
+  // If goal is about saving/storing to vdb, use vdb-specific plan
+  if (
+    /\b(save|store|add|put|ingest|import)\b.{0,40}\b(vdb|vector|db|database)\b/i.test(
+      goal,
+    )
+  ) {
+    const collectionName = extractVdbCollectionName(goal) || "data";
+    return {
+      steps: [
+        {
+          objective: `Create vector database collection "${collectionName}"`,
+          tool: "vdb_create",
+          dependsOn: -1,
+          allowedDuringAsync: false,
+        },
+        {
+          objective: `Add content to "${collectionName}" collection`,
+          tool: "vdb_add",
+          dependsOn: 0,
+          allowedDuringAsync: false,
+        },
+      ],
+      successCriterion: `Content stored in vector database collection "${collectionName}".`,
+    };
+  }
+
+  // Default fallback for other goals
   return {
     steps: [
       {
@@ -265,9 +340,11 @@ function fallbackPlan(goal: string): GoalPlan {
 // ── Next-step planning prompt ────────────────────────────────────────────────
 
 function buildSystemPrompt(): string {
-  const toolList = AGENT_TOOLS.map(
-    (t) => `  - ${t.name}: ${t.description.split("|")[0].trim()}`,
-  ).join("\n");
+  const toolList = AGENT_TOOLS.filter(
+    (t, i, arr) => arr.findIndex((x) => x.name === t.name) === i,
+  )
+    .map((t) => `  - ${t.name}: ${t.description.split("|")[0].trim()}`)
+    .join("\n");
 
   return `You are an autonomous AI agent. Select the NEXT single step to take.
 
@@ -294,7 +371,9 @@ function buildSystemPrompt(): string {
   9. vdb_add format is STRICT: vdb_add <collection_name> <text>
    - collection_name must be a single word with no spaces (use underscores: sad_songs)
    - If the text is long, summarize it to under 500 characters inline
-   - NEVER let the collection name bleed into the text content`;
+   - NEVER let the collection name bleed into the text content
+  10. If the goal references "this list", "that result", "previous output", etc., recent relevant results will be injected into the goal context, so you can directly plan steps that use that content without needing extra retrieval steps. 
+  `;
 }
 
 // ── Context builder (FIX 3) ──────────────────────────────────────────────────
@@ -492,7 +571,7 @@ export async function planNextStepWithContext(
     }
   }
 
-  const message = buildPlannerMessage({ ...ctx, pendingAsyncId }, stepNum);
+  const message = buildPlannerMessage(ctx, stepNum);
 
   const planned = await planNextStep(provider, message, model);
   if (planned.tool === "__planner_parse_error") {

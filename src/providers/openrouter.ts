@@ -34,6 +34,7 @@ import type {
   BatchPollResult,
   BatchProvider,
 } from "./batch-types.js";
+import { runConcurrent } from "../shared/utils/async.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -123,30 +124,6 @@ function buildThinkingBody(
   // DeepSeek-R1 and other reasoning models — no special params needed,
   // they always reason. Return empty to avoid API errors.
   return {};
-}
-
-// ── Concurrency-limited batch runner ─────────────────────────────────────────
-
-async function runConcurrent<T>(
-  tasks: (() => Promise<T>)[],
-  concurrency: number,
-): Promise<T[]> {
-  const results: T[] = new Array(tasks.length);
-  let idx = 0;
-
-  async function worker() {
-    while (idx < tasks.length) {
-      const i = idx++;
-      results[i] = await tasks[i]();
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, tasks.length) },
-    () => worker(),
-  );
-  await Promise.all(workers);
-  return results;
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────

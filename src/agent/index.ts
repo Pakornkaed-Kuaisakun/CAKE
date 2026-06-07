@@ -48,6 +48,7 @@ import {
   runWithSkill,
   skillNeedsConfirmation,
 } from "./skills/index.js";
+import { stripThinking } from "../shared/utils/utils.js";
 
 export { TokenBudgetTracker } from "./tokenBudgetTracker.js";
 
@@ -71,6 +72,12 @@ export interface RunOptions {
   onChunk?: StreamChunkCallback;
   /** Called at each meaningful phase change so the UI can show live progress. */
   onStep?: (step: TaskStep) => void;
+  /** Contextual autonomous results that may be referenced by the goal. */
+  recentResults?: Array<{
+    content: string;
+    source: string;
+    timestamp?: number;
+  }>;
 }
 
 const UNCACHEABLE_INTENTS = new Set([
@@ -278,39 +285,31 @@ export class CakeAgent {
     const context = (
       lastAssistant.displayContent ?? lastAssistant.content
     ).slice(0, 3000);
-
-    // ตรวจว่าเป็น numbered/bulleted list ไหม
     const listItems = this.extractListItems(context);
 
+    // ดึง collection name จาก input ถ้ามี
+    const colMatch = input.match(
+      /(?:to|into|in)\s+(?:a\s+|the\s+)?(?:vector\s+db|vdb|database)\s+(?:called\s+|named\s+)?(\w+)/i,
+    );
+    const collection = colMatch?.[1] ?? "my_collection";
+
     if (listItems.length > 0) {
-      const safeList = listItems.join(", ").slice(0, 800);
+      const itemsText = listItems.join("\n");
 
-      // เช็คว่าเป็น vdb intent จริงๆ ไหม
-      const isVdbIntent =
-        /\b(vdb|vector\s*db|vector\s*database|save.*db|store.*db)\b/i.test(
+      // ถ้า input บอกให้ save to vdb → return vdb_add command โดยตรง
+      if (
+        /\b(save|store|add|put)\b.{0,30}\b(vdb|vector|db|database)\b/i.test(
           input,
-        );
-
-      if (isVdbIntent) {
-        const collectionName =
-          input
-            .toLowerCase()
-            .replace(
-              /\b(save|store|add|this|list|to|the|a|an|into|vector|db|vdb)\b/gi,
-              "",
-            )
-            .trim()
-            .replace(/[^a-z0-9]+/g, "_")
-            .replace(/^_+|_+$/g, "")
-            .slice(0, 30) || "my_list";
-
-        return `vdb_add ${collectionName} ${safeList}`;
+        )
+      ) {
+        return `vdb_add ${collection} ${itemsText}`;
       }
 
-      // กรณีอื่น: inject context แบบเดิม แต่ไม่ hardcode collection
-      return `${input}\n\nList items:\n${safeList}`;
+      // กรณีอื่น ยังส่ง context เหมือนเดิม
+      return `${input}\n\nContext: ${itemsText}`;
     }
-    return input;
+
+    return `${input}\n\nContext from previous response:\n${context.slice(0, 800)}`;
   }
 
   shouldRetrieveMemory(inputLength: number): boolean {
@@ -628,6 +627,39 @@ export class CakeAgent {
       const effectiveInput = ["autonomous", "auto", "agent"].includes(intent)
         ? this.resolveConversationalReferences(trimmed)
         : trimmed;
+
+      // Populate recentResults for autonomous goals from conversation history
+      if (
+        ["autonomous", "auto", "agent"].includes(intent) &&
+        !opts.recentResults
+      ) {
+        const messages = this.history.getAllForDisplay();
+        const lastAssistant = [...messages]
+          .reverse()
+          .find((m) => m.role === "assistant" && m.content.length > 30);
+        if (lastAssistant) {
+          opts.recentResults = [
+            {
+              source: "previous_result",
+              content: lastAssistant.content,
+              timestamp: Date.now(),
+            },
+          ];
+        }
+      }
+
+      if (effectiveInput.startsWith("vdb_add ")) {
+        const vdbHandler = intentMap["vdb_add"];
+        if (vdbHandler) {
+          const result = await vdbHandler(
+            this.provider,
+            effectiveInput,
+            this.model,
+            opts,
+          );
+          return { text: stripThinking(result.text), usage: result.usage };
+        }
+      }
 
       const rawResult = await aiHandler(
         this.provider,

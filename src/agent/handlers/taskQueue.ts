@@ -24,34 +24,7 @@ import {
 } from "../taskQueue.js";
 import { getFastModel } from "../../providers/utils.js";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function stripVerb(input: string, verbs: string[]): string {
-  for (const v of verbs) {
-    const re = new RegExp(`^${v}\\s*`, "i");
-    if (re.test(input)) return input.replace(re, "").trim();
-  }
-  return input.trim();
-}
-
-function fmtMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`;
-}
-
-function fmtAge(ts: number): string {
-  const s = Math.floor((Date.now() - ts) / 1000);
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ${m % 60}m ago`;
-}
-
-function fmtDate(ts?: number): string {
-  if (!ts) return "—";
-  return new Date(ts).toLocaleString();
-}
+import { fmtMs, fmtAge, fmtDate, stripVerb } from "../../shared/utils/utils.js";
 
 const PRIORITY_ICONS: Record<TaskPriority, string> = {
   critical: "🔴",
@@ -267,9 +240,11 @@ export async function handleTqStatus(
     `  Status     : ${task.status}`,
     `  Priority   : ${PRIORITY_ICONS[task.priority]} ${task.priority}`,
     `  Progress   : ${task.progress}%${task.progressMessage ? ` — ${task.progressMessage}` : ""}`,
-    `  Created    : ${fmtDate(task.createdAt)} (${fmtAge(task.createdAt)})`,
-    task.startedAt ? `  Started    : ${fmtDate(task.startedAt)}` : "",
-    task.completedAt ? `  Finished   : ${fmtDate(task.completedAt)}` : "",
+    `  Created    : ${fmtDate(String(task.createdAt))} (${fmtAge(task.createdAt)})`,
+    task.startedAt ? `  Started    : ${fmtDate(String(task.startedAt))}` : "",
+    task.completedAt
+      ? `  Finished   : ${fmtDate(String(task.completedAt))}`
+      : "",
     task.startedAt && task.completedAt
       ? `  Duration   : ${fmtMs(task.completedAt - task.startedAt)}`
       : "",

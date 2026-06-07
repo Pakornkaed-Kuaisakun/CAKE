@@ -1,5 +1,7 @@
 import fs from "fs";
 import path from "path";
+import { readDocument } from "../documents/index.js";
+import { formatSize } from "../../shared/utils/utils.js";
 
 type DirectoryTreeOptions = {
   maxDepth?: number;
@@ -7,18 +9,6 @@ type DirectoryTreeOptions = {
   comments?: Record<string, string>; // optionals: for comments
   showSize?: boolean;
 };
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  if (mb < 1024) return `${mb.toFixed(1)} MB`;
-  const gb = mb / 1024;
-  return `${gb.toFixed(1)} GB`;
-}
-
-import { readDocument } from "../documents/index.js";
 
 export async function readFile(filePath: string): Promise<string> {
   const p = path.resolve(filePath);

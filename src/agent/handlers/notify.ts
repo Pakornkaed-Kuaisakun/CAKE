@@ -1,6 +1,7 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { notify } from "../../modules/notify/index.js";
 import { text } from "../utils/text.js";
+import { stripVerb } from "../../shared/utils/utils.js";
 
 export async function handleNotify(
   _provider: AIProvider,
@@ -8,7 +9,7 @@ export async function handleNotify(
   _model?: string,
 ): Promise<ChatResult> {
   // Extract message from input (e.g., "notify take a pill" -> "take a pill")
-  const message = input.replace(/^(notify|remind|alert)\s+/i, "").trim();
+  const message = stripVerb(input, ["notify", "remind", "alert"]);
   
   if (!message) return text("Please specify what to notify.");
 

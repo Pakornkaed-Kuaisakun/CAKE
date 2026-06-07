@@ -31,20 +31,7 @@ import {
   BUILTIN_SERVER_TEMPLATES,
 } from "../../modules/mcp/registry.js";
 import type { MCPServerConfig } from "../../modules/mcp/types.js";
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function stripVerb(input: string, verbs: string[]): string {
-  for (const v of verbs) {
-    const re = new RegExp(`^${v}\\s*`, "i");
-    if (re.test(input)) return input.replace(re, "").trim();
-  }
-  return input.trim();
-}
-
-function formatDuration(ms: number): string {
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-}
+import { stripVerb, formatDuration } from "../../shared/utils/utils.js";
 
 // ── mcp (status overview) ─────────────────────────────────────────────────────
 

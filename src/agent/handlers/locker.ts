@@ -32,6 +32,8 @@ import {
   findEntryByLabel,
   lockerFilePath,
 } from "../../modules/locker/index.js";
+import { stripVerb, fmtDate, stripQuotes } from "../../shared/utils/utils.js";
+
 
 // ── Password sentinel ─────────────────────────────────────────────────────────
 // Injected into the re-call input when Ink has collected the password.
@@ -54,23 +56,6 @@ function extractPassword(input: string): {
   return { cleaned, password };
 }
 
-/** Strip the leading verb from the raw input */
-function stripVerb(input: string, verbs: string[]): string {
-  for (const v of verbs) {
-    const re = new RegExp(`^${v}\\s*`, "i");
-    if (re.test(input)) return input.replace(re, "").trim();
-  }
-  return input.trim();
-}
-
-function fmtDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
-}
-
 // ── locker_add ────────────────────────────────────────────────────────────────
 
 export async function handleLockerAdd(
@@ -88,10 +73,7 @@ export async function handleLockerAdd(
 
   const catMatch = beforeVal.match(/--category\s+(\S+)/i);
   const category = catMatch?.[1];
-  const label = beforeVal
-    .replace(/--category\s+\S+/i, "")
-    .trim()
-    .replace(/^["']|["']$/g, "");
+  const label = stripQuotes(beforeVal.replace(/--category\s+\S+/i, ""));
 
   if (!label) {
     return text(

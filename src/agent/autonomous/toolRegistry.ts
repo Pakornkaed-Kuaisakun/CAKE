@@ -305,11 +305,6 @@ export const AGENT_TOOLS: AgentTool[] = [
   },
   {
     name: "vdb_list",
-    description: "List all vector database collections. | vdb_list",
-    example: "vdb_list",
-  },
-  {
-    name: "vdb_list",
     description: "List specific collections. | vdb_list <collection>",
     example: "vdb_list songs",
   },
@@ -334,11 +329,6 @@ export const AGENT_TOOLS: AgentTool[] = [
     name: "vdb_clear",
     description: "Delete all collections in the vector database. | vdb_clear",
     example: "vdb_clear",
-  },
-  {
-    name: "vdb_query",
-    description: "Query all collections in the vector database. | vdb_query",
-    example: "vdb_query",
   },
   {
     name: "chat",

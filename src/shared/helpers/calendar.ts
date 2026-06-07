@@ -35,7 +35,6 @@ export async function exactEvent(
     model: fastModel,
   });
 
-
   try {
     return { text: res.text, usage: res.usage };
   } catch {

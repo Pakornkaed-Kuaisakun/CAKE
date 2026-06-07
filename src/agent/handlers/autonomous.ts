@@ -3,6 +3,7 @@ import { executeHybridAutonomous } from "../autonomous/index.js";
 import { AGENT_TOOLS } from "../autonomous/toolRegistry.js";
 import { text } from "../utils/text.js";
 import type { RunOptions } from "../index.js";
+import { stripVerb } from "../../shared/utils/utils.js";
 
 /**
  * Strips the trigger prefix from the user input to extract the bare goal.
@@ -14,7 +15,14 @@ import type { RunOptions } from "../index.js";
  *   "run auto <goal>"
  */
 function extractGoal(input: string): string {
-  return input.replace(/^(run\s+)?(auto|agent|autonomous)\s+/i, "").trim();
+  return stripVerb(input, [
+    "run agent",
+    "run auto",
+    "run autonomous",
+    "agent",
+    "auto",
+    "autonomous",
+  ]);
 }
 
 /**
@@ -59,6 +67,7 @@ function formatStep(step: {
   return lines.join("\n");
 }
 
+
 export async function handleAutonomous(
   provider: AIProvider,
   input: string,
@@ -66,7 +75,6 @@ export async function handleAutonomous(
   options?: RunOptions,
 ): Promise<ChatResult> {
   const goal = extractGoal(input);
-
   if (!goal) {
     const toolNames = AGENT_TOOLS.map(
       (t) => `  • ${t.name} — ${t.description}`,
@@ -89,11 +97,12 @@ export async function handleAutonomous(
 
   const stepLines: string[] = [];
 
-  const result = await executeHybridAutonomous(provider, goal, {
-    maxSteps: 10,
-    model,
-    signal: options?.signal,
-    onStep: (step) => {
+    const result = await executeHybridAutonomous(provider, goal, {
+      maxSteps: 10,
+      model,
+      signal: options?.signal,
+      recentResults: options?.recentResults,
+      onStep: (step) => {
       const line = formatStep(step);
       stepLines.push(line);
 

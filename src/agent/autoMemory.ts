@@ -20,6 +20,7 @@ import type { AIProvider } from "../providers/types.js";
 import { EpisodeStore, DecisionStore } from "../modules/memory/episodes.js";
 import { MemoryManager } from "../modules/memory/index.js";
 import { getFastModel } from "../providers/utils.js";
+import { withTimeout } from "../shared/utils/utils.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -151,10 +152,35 @@ function hasAnySignal(text: string, signals: string[]): boolean {
 
 // ── SYSTEM PROMPT for the single extraction LLM call ─────────────────────────
 
-const EXTRACTION_SYSTEM = `Extract memory signals. Reply JSON only:
-{"d":false,"f":false,"dt":"<decision or null>","ft":"<fact or null>","ft_type":null,"conf":0.5}
-d=decision made, f=important fact, dt=decision text, ft=fact text, ft_type=person|project|task|preference|fact, conf=0-1
-Skip greetings. Only record firm decisions and key facts.`;
+const EXTRACTION_SYSTEM = `
+Extract memory signals. Reply JSON only:
+
+Output format:
+{"d":false,"f":false,"dt":null,"ft":null,"ft_type":null,"conf":0.5}
+
+Fields:
+- d (boolean): true if a firm decision was made
+- f (boolean): true if an important fact was stated  
+- dt (string|null): the decision text
+- ft (string|null): the fact text
+- ft_type: "person"|"project"|"task"|"preference"|"fact"|"event"|null
+- conf (0.0-1.0): confidence score
+
+Examples:
+USER: "Let's go with PostgreSQL for this project"
+→ {"d":true,"f":true,"dt":"Use PostgreSQL for the project","ft":"Project uses PostgreSQL","ft_type":"project","conf":0.9}
+
+USER: "I prefer concise answers without bullet points"  
+→ {"d":false,"f":true,"dt":null,"ft":"User prefers concise answers without bullet points","ft_type":"preference","conf":0.85}
+
+USER: "ok thanks"
+→ {"d":false,"f":false,"dt":null,"ft":null,"ft_type":null,"conf":0.1}
+
+USER: "We decided to launch on Friday"
+→ {"d":true,"f":false,"dt":"Launch scheduled for Friday","ft":null,"ft_type":null,"conf":0.8}
+
+Skip greetings. Only record firm decisions and key facts.
+`;
 
 // ── AutoMemoryManager ─────────────────────────────────────────────────────────
 
@@ -198,32 +224,20 @@ export class AutoMemoryManager {
 
     // Queue processing sequentially so rapid back-to-back turns are processed in order
     this.processingPromise = this.processingPromise
-      .then(() => this._processWithTimeout(userInput, assistantResponse))
+      .then(() =>
+        withTimeout(
+          this._processAsync(userInput, assistantResponse),
+          this.config.processingTimeoutMs,
+        ),
+      )
       .catch((err) => {
         if (process.env.DEBUG) {
           console.warn("[AutoMemory] processing error:", err?.message ?? err);
         }
+      })
+      .then(() => {
+        this.processingPromise = Promise.resolve();
       });
-  }
-
-  private _processWithTimeout(
-    userInput: string,
-    assistantResponse: string,
-  ): Promise<void> {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => {
-        reject(new Error("AutoMemory turn processing timed out"));
-      }, this.config.processingTimeoutMs);
-    });
-
-    return Promise.race([
-      this._processAsync(userInput, assistantResponse),
-      timeoutPromise,
-    ]).finally(() => {
-      if (timeout) clearTimeout(timeout);
-    });
   }
 
   /**

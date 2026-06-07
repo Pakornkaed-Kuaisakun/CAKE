@@ -15,16 +15,7 @@ import { useAgent } from "./hooks/useAgent.js";
 import { VoiceBar } from "./components/VoiceBar.js";
 import { useVoice } from "./hooks/useVoice.js";
 import { LockerBar } from "./components/LockerBar.js";
-
-function formatMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
-function formatCost(usd: number): string {
-  if (usd < 0.001) return `<$0.001`;
-  return `$${usd.toFixed(4)}`;
-}
+import { formatMs, formatCost } from "../shared/utils/utils.js";
 
 export function App() {
   const {

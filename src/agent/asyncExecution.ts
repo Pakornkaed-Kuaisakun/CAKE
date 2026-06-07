@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { withTimeout } from "../shared/utils/utils.js";
 
 export type AsyncTaskStatus =
   | "pending"
@@ -81,7 +82,7 @@ export class AsyncExecutionQueue {
         next.startedAt = Date.now();
 
         try {
-          const result = await this.runWithTimeout(next.executor);
+          const result = await withTimeout(next.executor(), this.taskTimeoutMs, "Task timeout");
           next.result = result;
           next.status = "completed";
         } catch (err: any) {
@@ -94,20 +95,6 @@ export class AsyncExecutionQueue {
     } finally {
       this.processing = false;
     }
-  }
-
-  private runWithTimeout(executor: () => Promise<string>): Promise<string> {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeout = setTimeout(() => {
-        reject(new Error("Task timeout"));
-      }, this.taskTimeoutMs);
-    });
-
-    return Promise.race([executor(), timeoutPromise]).finally(() => {
-      if (timeout) clearTimeout(timeout);
-    });
   }
 }
 

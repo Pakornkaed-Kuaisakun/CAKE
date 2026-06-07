@@ -17,6 +17,7 @@ import {
   updateDeepSearchRun,
   updateDeepSearchTimelineEntry,
 } from "./monitor.js";
+import { batchRun } from "../../shared/utils/utils.js";
 
 /**
  * BUG FIX: The original batchRun had a race condition where reject() could be
@@ -32,54 +33,6 @@ import {
  * resolve/reject again. In-flight tasks still complete (we can't cancel them)
  * but their results are discarded.
  */
-function batchRun<T>(
-  tasks: Array<() => Promise<T>>,
-  concurrency: number,
-): Promise<T[]> {
-  if (tasks.length === 0) return Promise.resolve([]);
-
-  const results = new Array<T>(tasks.length);
-
-  return new Promise((resolve, reject) => {
-    let index = 0;
-    let completed = 0;
-    let aborted = false;
-
-    const runNext = async () => {
-      // Exit immediately after any rejection or when nothing left to start
-      if (aborted || index >= tasks.length) return;
-
-      const taskIndex = index++;
-
-      try {
-        results[taskIndex] = await tasks[taskIndex]();
-      } catch (error) {
-        if (!aborted) {
-          aborted = true;
-          reject(error);
-        }
-        // Do NOT call runNext() after a rejection — stop launching new tasks
-        return;
-      }
-
-      completed++;
-
-      if (completed === tasks.length) {
-        resolve(results);
-        return;
-      }
-
-      // Start the next task in place of this one
-      runNext();
-    };
-
-    // Seed the initial concurrency pool
-    const initial = Math.min(concurrency, tasks.length);
-    for (let i = 0; i < initial; i++) {
-      runNext();
-    }
-  });
-}
 
 export async function collectHits(
   provider: AIProvider | undefined,

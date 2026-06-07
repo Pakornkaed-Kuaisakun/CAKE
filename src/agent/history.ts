@@ -2,6 +2,7 @@
 
 import { EpisodeStore } from "../modules/memory/episodes.js";
 import type { AIProvider } from "../providers/types.js";
+import { runConcurrent } from "../shared/utils/utils.js";
 
 export interface HistoryMessage {
   role: "user" | "assistant" | "system";
@@ -29,27 +30,6 @@ export interface HistoryMessage {
 //   Capping concurrency to 3 keeps throughput reasonable while staying well
 //   under typical provider rate limits (even free tiers allow ~5 RPM bursts).
 
-async function runConcurrent<T>(
-  tasks: Array<() => Promise<T>>,
-  limit: number,
-): Promise<T[]> {
-  const results: T[] = new Array(tasks.length);
-  let nextIdx = 0;
-
-  async function worker(): Promise<void> {
-    while (nextIdx < tasks.length) {
-      const idx = nextIdx++;
-      results[idx] = await tasks[idx]();
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () =>
-    worker(),
-  );
-  await Promise.all(workers);
-  return results;
-}
-
 // ── ConversationHistory ───────────────────────────────────────────────────────
 
 export class ConversationHistory {
@@ -57,7 +37,7 @@ export class ConversationHistory {
   private readonly maxMessages = 15;
   private readonly softTokenBudget = 3000;
   private readonly summarizeThreshold = 600;
-  private readonly summarizeConcurrency = 2;
+  private readonly summarizeConcurrency = 3;
 
   push(
     role: HistoryMessage["role"],
@@ -173,9 +153,12 @@ export class ConversationHistory {
     } catch {
       // Fallback: hard truncation with an honest label so both LLM and UI
       // see the same thing (no split-brain)
+      const totalChars = m.content.length;
+      const keptChars = this.summarizeThreshold;
+      const droppedChars = totalChars - keptChars;
       const fallback =
         m.content.slice(0, this.summarizeThreshold) +
-        "…[truncated — summarization unavailable]";
+        `…[${droppedChars} chars omitted — summarization unavailable]`;
       return {
         ...m,
         content: fallback,

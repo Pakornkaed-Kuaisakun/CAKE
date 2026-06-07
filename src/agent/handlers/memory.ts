@@ -4,6 +4,7 @@ import { readDocument, chunkText } from "../../modules/documents/index.js";
 import { MemoryManager } from "../../modules/memory/index.js";
 import { text } from "../utils/text.js";
 import { EpisodeStore, DecisionStore } from "../../modules/memory/episodes.js";
+import { stripQuotes } from "../../shared/utils/utils.js";
 
 export async function handleIndexDocument(
   provider: AIProvider,
@@ -14,7 +15,7 @@ export async function handleIndexDocument(
     const match = input.match(/(?:index|learn|remember)\s+(.+)/i);
     if (!match) return text("Please specify a document to index.");
 
-    const rawPath = match[1].trim().replace(/^["']|["']$/g, "");
+    const rawPath = stripQuotes(match[1]);
     const filePath = path.resolve(rawPath);
 
     const content = await readDocument(filePath);

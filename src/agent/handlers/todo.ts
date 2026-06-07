@@ -7,6 +7,7 @@ import {
   generatePlan,
 } from "../../modules/todo/index.js";
 import { text } from "../utils/text.js";
+import { stripVerb } from "../../shared/utils/utils.js";
 
 export async function handleTodoList(
   _provider: AIProvider,
@@ -29,7 +30,13 @@ export async function handleTodoAdd(
   input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  const title = input.replace(/(add|create|new)\s+(todo|task):?\s*/i, "").trim();
+  const title = stripVerb(input, [
+    "add todo:", "create todo:", "new todo:",
+    "add task:", "create task:", "new task:",
+    "add todo", "create todo", "new todo",
+    "add task", "create task", "new task",
+    "todo_add", "todo add"
+  ]);
   const todo = addTodo(title);
   return text(`✅ Added: ${todo.title}`);
 }
@@ -39,7 +46,12 @@ export async function handlePlan(
   input: string,
   model?: string,
 ): Promise<ChatResult> {
-  const goal = input.replace(/(plan|planning|breakdown|break down)\s+(for\s+|goal\s+)?/i, "").trim();
+  const goal = stripVerb(input, [
+    "plan for goal", "planning for goal", "breakdown for goal", "break down for goal",
+    "plan for", "planning for", "breakdown for", "break down for",
+    "plan goal", "planning goal", "breakdown goal", "break down goal",
+    "plan", "planning", "breakdown", "break down"
+  ]);
   const todos = await generatePlan(provider, goal, model);
   const list = todos.map((t, i) => `  ${i + 1}. [${t.priority}] ${t.title}`).join("\n");
   return text(`[TODO] Created ${todos.length} tasks for "${goal}":\n${list}`);
@@ -50,7 +62,7 @@ export async function handleTodoRemove(
   input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  const id = input.replace(/todo_remove\s*/i, "").trim();
+  const id = stripVerb(input, ["todo_remove", "todo remove", "remove todo", "delete todo", "remove task", "delete task"]);
   if (!id) return text("Please provide a task ID to remove.");
   const success = removeTodo(id);
   return text(success ? `✅ Removed task: ${id}` : `❌ Task not found: ${id}`);

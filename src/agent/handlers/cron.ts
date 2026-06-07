@@ -3,6 +3,7 @@ import { CronManager } from "../../modules/cron/index.js";
 import { text } from "../utils/text.js";
 
 import { getFastModel } from "../../providers/utils.js";
+import { parseJsonMarkdown } from "../../shared/utils/utils.js";
 
 // Singleton manager instance - ในระบบจริงควรส่งผ่าน Agent
 let manager: CronManager | null = null;
@@ -40,15 +41,7 @@ export async function handleScheduleTask(
   });
   
   try {
-
-    // 1. ลบ Markdown blocks
-    let cleaned = response.text.replace(/```json|```/g, "").trim();
-    
-    // 2. ลบ Single line comments (// ...) ที่ AI ชอบใส่มาใน JSON
-    cleaned = cleaned.replace(/\/\/.*$/gm, "");
-
-    const data = JSON.parse(cleaned);
-
+    const data = parseJsonMarkdown(response.text);
 
     const job = await manager.addJob(data.name, data.cronExpression, data.task);
 

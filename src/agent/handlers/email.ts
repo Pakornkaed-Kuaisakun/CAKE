@@ -8,6 +8,8 @@ import {
   parseEmailCommand,
 } from "../../modules/email/index.js";
 import { text } from "../utils/text.js";
+import { parseJsonMarkdown, stripQuotes } from "../../shared/utils/utils.js";
+
 
 export async function handleEmail(
   provider: AIProvider,
@@ -62,8 +64,7 @@ export async function handleSendEmail(
       { model },
     );
     try {
-      const cleanJson = result.text.trim().replace(/```json|```/g, "");
-      const aiParsed = JSON.parse(cleanJson);
+      const aiParsed = parseJsonMarkdown(result.text);
       if (parsed) {
         parsed.to = aiParsed.to || parsed.to;
         parsed.subject = aiParsed.subject || parsed.subject;
@@ -93,7 +94,7 @@ export async function handleSendEmail(
     const potentialPath = fileMatch ? fileMatch[1].trim() : pipedContent.trim();
 
     // Clean up quotes or markdown formatting
-    const cleanPath = potentialPath.replace(/^[`"']|[`"']$/g, "").trim();
+    const cleanPath = stripQuotes(potentialPath);
 
     if (cleanPath && (path.isAbsolute(cleanPath) || cleanPath.includes("."))) {
       try {

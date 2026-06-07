@@ -4,11 +4,12 @@ import {
   createEvent,
   deleteEvent,
 } from "../../modules/calendar/index.js";
-import { exactEvent } from "../calendarHelper/exactEvent.js";
+import { exactEvent } from "../../shared/helpers/calendar.js";
 import { text } from "../utils/text.js";
 import fs from "fs";
 import path from "path";
 import { CAKE_DIR } from "../../config/constants.js";
+import { parseJsonMarkdown } from "../../shared/utils/utils.js";
 
 const CALENDAR_CACHE_DIR = path.join(CAKE_DIR, "cache");
 const CALENDAR_CACHE_FILE = path.join(
@@ -56,8 +57,7 @@ export async function handleCalendarCreate(
   let event: any;
 
   try {
-    const cleaned = raw.text.replace(/```json|```/g, "").trim();
-    event = JSON.parse(cleaned);
+    event = parseJsonMarkdown(raw.text);
   } catch (err) {
     return { text: `Failed to parse event data.\n\nAI response:\n${raw.text}` };
   }

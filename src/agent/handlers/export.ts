@@ -2,6 +2,7 @@
 import fs from "fs";
 import path from "path";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
+import { stripQuotes } from "../../shared/utils/utils.js";
 import {
   guardOperation,
   getPermissionLevel,
@@ -44,7 +45,7 @@ export function resolveExportPermissionCategory(
 }
 
 function resolveOutput(format: ExportFormat, argsAfterFormat: string): string {
-  const raw = argsAfterFormat.trim().replace(/^["']|["']$/g, "");
+  const raw = stripQuotes(argsAfterFormat);
   let target: string;
   if (!raw) {
     target = `output-${Date.now()}.${format}`;

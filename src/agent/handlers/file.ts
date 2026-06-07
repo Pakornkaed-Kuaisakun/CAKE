@@ -10,7 +10,7 @@ import {
   findFiles,
 } from "../../modules/files/index.js";
 import { text } from "../utils/text.js";
-import { formatSize } from "../utils/format.js";
+import { formatSize } from "../../shared/utils/utils.js";
 import {
   guardOperation,
   type PermissionRequest,

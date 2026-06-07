@@ -38,6 +38,7 @@ import {
 import crypto from "crypto";
 import { CheckpointManager } from "./checkpoint.js";
 import { getFastModel, getFullModel } from "../../providers/utils.js";
+import { resolvePlaceholders } from "../../shared/utils/utils.js";
 
 const DEFAULT_MAX_STEPS = 20;
 const ASYNC_POLL_DELAY_MS = 250;
@@ -53,14 +54,12 @@ export interface ExecutorOptions {
   workerModel?: string;
   signal?: AbortSignal;
   resumeFromCheckpoint?: boolean;
-}
-
-function resolvePlaceholders(input: string, state: ExecutionState): string {
-  return input.replace(/\{\{step:(\d+)\.output\}\}/gi, (match, stepNum) => {
-    const num = Number(stepNum);
-    const step = state.completedSteps.find((s) => s.step === num);
-    return step?.fullOutput ?? step?.outputSummary ?? match;
-  });
+  /** Previous results that may be referenced by the goal (e.g., "save this list") */
+  recentResults?: Array<{
+    content: string;
+    source: string;
+    timestamp?: number;
+  }>;
 }
 
 export async function executeAutonomous(
@@ -76,8 +75,8 @@ export async function executeAutonomous(
     workerModel,
     signal,
     resumeFromCheckpoint = false,
+    recentResults,
   } = options;
-
   const resolvedPlannerModel =
     plannerModel || getFastModel(provider.name) || model;
   const resolvedWorkerModel =
@@ -85,8 +84,9 @@ export async function executeAutonomous(
 
   const goalId = crypto
     .createHash("sha256")
-    .update(goal + Date().toString())
-    .digest("hex");
+    .update(goal)
+    .digest("hex")
+    .slice(0, 16);
   const checkpointMgr = new CheckpointManager();
   const existing = resumeFromCheckpoint ? checkpointMgr.load(goalId) : null;
 
@@ -95,7 +95,12 @@ export async function executeAutonomous(
   // model of what "done" means and what sequence makes sense.
   let goalPlan: GoalPlan;
   try {
-    goalPlan = await planGoal(provider, goal, resolvedPlannerModel);
+    goalPlan = await planGoal(
+      provider,
+      goal,
+      resolvedPlannerModel,
+      recentResults,
+    );
   } catch {
     // Non-fatal: fall back to a single-step plan
     goalPlan = {
@@ -110,7 +115,6 @@ export async function executeAutonomous(
       successCriterion: "Goal completed.",
     };
   }
-
   // ── State initialisation ───────────────────────────────────────────────────
   let state: ExecutionState;
   let startStep = 1;
@@ -251,7 +255,7 @@ export async function executeAutonomous(
     }
 
     if (tool === "vdb_add" || tool === "vdb_ingest") {
-      input = resolvePlaceholders(input, state);
+      input = resolvePlaceholders(input, state.completedSteps);
       if (input.split(" ").length < 5) {
         const lastChatOutput = state.completedSteps
           .filter((s) => s.tool === "chat" && s.success)

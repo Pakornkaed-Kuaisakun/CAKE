@@ -3,6 +3,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { text } from "../utils/text.js";
+import { stripVerb } from "../../shared/utils/utils.js";
 import {
   guardOperation,
   classifyBashCommand,
@@ -26,7 +27,7 @@ function isSafe(cmd: string): boolean {
 }
 
 function extractBashCommand(input: string): string {
-  return input.replace(/^(bash|run|shell|\$)\s+/i, "").trim();
+  return stripVerb(input, ["bash", "run", "shell", "\\$"]);
 }
 
 // ── Default ask handler (CLI readline fallback) ───────────────────────────────

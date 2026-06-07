@@ -16,10 +16,15 @@ import {
   fetchEnhancedStockData,
   analyzeStock,
   generateReport,
+} from "../../modules/finance/index.js";
+import {
   formatCurrency,
   formatLargeNumber,
   formatPct,
-} from "../../modules/finance/index.js";
+  asciiBar,
+  sentimentBar,
+  changeArrow,
+} from "../../shared/utils/utils.js";
 import {
   guardOperation,
   getPermissionLevel,
@@ -220,29 +225,6 @@ export function extractTicker(input: string): string | null {
   return null;
 }
 
-// ── Formatting helpers ────────────────────────────────────────────────────────
-
-function bar(value: number, max: number, width = 20): string {
-  const filled = Math.round((Math.min(value, max) / max) * width);
-  return (
-    "█".repeat(Math.max(0, filled)) + "░".repeat(width - Math.max(0, filled))
-  );
-}
-
-function sentimentBar(score: number): string {
-  // score: -1 (bearish) to +1 (bullish)
-  const normalized = (score + 1) / 2; // 0..1
-  const pos = Math.round(normalized * 10);
-  const neg = 10 - pos;
-  return "🔴".repeat(neg) + "🟢".repeat(pos);
-}
-
-function changeArrow(change: number): string {
-  if (change > 0) return `▲ +${formatPct(change)}`;
-  if (change < 0) return `▼ ${formatPct(change)}`;
-  return `● 0.00%`;
-}
-
 // ── Main handler ──────────────────────────────────────────────────────────────
 
 export async function handleFinanceReport(
@@ -325,7 +307,7 @@ export async function handleFinanceReport(
     `  52-Week Range   : ${formatCurrency(stock.fiftyTwoWeekLow ?? 0, stock.currency)} — ${formatCurrency(stock.fiftyTwoWeekHigh ?? 0, stock.currency)}`,
     ...(stock.fiftyTwoWeekLow && stock.fiftyTwoWeekHigh
       ? [
-          `  Position in Range: [${bar(
+          `  Position in Range: [${asciiBar(
             (stock.price ?? 0) - stock.fiftyTwoWeekLow,
             stock.fiftyTwoWeekHigh - stock.fiftyTwoWeekLow,
           )}]  ${Math.round((((stock.price ?? 0) - stock.fiftyTwoWeekLow) / (stock.fiftyTwoWeekHigh - stock.fiftyTwoWeekLow)) * 100)}%`,

@@ -279,18 +279,13 @@ export function keywordSearch(
     if (!store) continue;
 
     for (const doc of store.documents) {
-      const store = loadCollection(col);
-      if (!store) continue;
-
-      for (const doc of store.documents) {
-        const text = doc.text.toLocaleLowerCase();
-        let score = 0;
-        for (const word of words) {
-          if (text.includes(word)) score += 1 / words.length;
-        }
-        if (score > 0) {
-          results.push({ document: doc, score, collection: col });
-        }
+      const text = doc.text.toLocaleLowerCase();
+      let score = 0;
+      for (const word of words) {
+        if (text.includes(word)) score += 1 / words.length;
+      }
+      if (score > 0) {
+        results.push({ document: doc, score, collection: col });
       }
     }
   }

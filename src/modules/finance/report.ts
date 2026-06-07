@@ -10,7 +10,11 @@ import PDFDocument from "pdfkit";
 
 import type { StockData } from "./types.js";
 import type { EnhancedStockData } from "./enhanced.js";
-import { formatCurrency, formatLargeNumber, formatPct } from "./format.js";
+import {
+  formatCurrency,
+  formatLargeNumber,
+  formatPct,
+} from "../../shared/utils/utils.js";
 
 export async function generateReport(
   stock: EnhancedStockData | StockData,

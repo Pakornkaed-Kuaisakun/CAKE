@@ -1,13 +1,23 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { searchAndAnswer } from "../../modules/search/index.js";
 import { text } from "../utils/text.js";
+import { stripVerb } from "../../shared/utils/utils.js";
 
 export async function handleSearch(
   provider: AIProvider,
   input: string,
   model?: string,
 ): Promise<ChatResult> {
-  const query = input.replace(/^(search|find|look up|google)\s+(for\s+)?/i, "").trim();
+  const query = stripVerb(input, [
+    "search for",
+    "find for",
+    "look up for",
+    "google for",
+    "search",
+    "find",
+    "look up",
+    "google",
+  ]);
   const result = await searchAndAnswer(provider, query, model);
   return text(`[SEARCH] ${result}`);
 }

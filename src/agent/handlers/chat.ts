@@ -1,5 +1,6 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { STATIC_CORE_PROMPT } from "../promptAssembler.js";
+import { stripThinking } from "../../shared/utils/utils.js";
 
 /**
  * handleChat handles general conversation.
@@ -19,7 +20,7 @@ export async function handleChat(
   });
 
   return {
-    text: result.text,
+    text: stripThinking(result.text),
     usage: result.usage,
   };
 }
