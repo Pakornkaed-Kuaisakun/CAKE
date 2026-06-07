@@ -33,7 +33,7 @@ import {
 } from "../../agent/permissions/index.js";
 import type { ChatResult, AIProvider } from "../../providers/types.js";
 import type { RunOptions } from "../index.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 // ── Common English stop words that are never tickers ─────────────────────────
 const STOP_WORDS = new Set([
@@ -237,7 +237,7 @@ export async function handleFinanceReport(
   const wantPdf = /--pdf\b/i.test(input);
 
   if (!symbol) {
-    return text(
+    return formatChatResult(
       [
         "Please provide a stock ticker symbol.",
         "",
@@ -278,7 +278,7 @@ export async function handleFinanceReport(
       ``,
       `Tip: Use the exact exchange symbol, e.g. "BRK.B" not "BERKSHIRE".`,
     );
-    return text(lines.join("\n"));
+    return formatChatResult(lines.join("\n"));
   }
 
   emit(`[FINANCE] Running AI analysis…\n`);
@@ -405,18 +405,18 @@ export async function handleFinanceReport(
     );
 
     if (!guard.allowed) {
-      return text(`🚫 ${guard.reason ?? "Permission denied."}`);
+      return formatChatResult(`🚫 ${guard.reason ?? "Permission denied."}`);
     }
 
     emit(`\n📄 Generating PDF report…\n`);
     try {
       const pdfPath = await generateReport(stock, analysis.text);
       emit(`✅ PDF saved: ${pdfPath}\n`);
-      return text(reportText + `\n📄 PDF saved: ${pdfPath}`);
+      return formatChatResult(reportText + `\n📄 PDF saved: ${pdfPath}`);
     } catch (err: any) {
       emit(`⚠️  PDF generation failed: ${err.message}\n`);
     }
   }
 
-  return text(reportText);
+  return formatChatResult(reportText);
 }

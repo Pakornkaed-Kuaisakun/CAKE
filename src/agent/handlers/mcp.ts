@@ -19,7 +19,6 @@
 //   mcp_prompts [server]   — list available prompts
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import { getMCPManager } from "../../modules/mcp/manager.js";
 import {
   addServer,
@@ -31,7 +30,11 @@ import {
   BUILTIN_SERVER_TEMPLATES,
 } from "../../modules/mcp/registry.js";
 import type { MCPServerConfig } from "../../modules/mcp/types.js";
-import { stripVerb, formatDuration } from "../../shared/utils/utils.js";
+import {
+  stripVerb,
+  formatDuration,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 // ── mcp (status overview) ─────────────────────────────────────────────────────
 
@@ -44,7 +47,7 @@ export async function handleMcp(
   const statuses = manager.getStatus();
 
   if (statuses.length === 0) {
-    return text(
+    return formatChatResult(
       [
         "[MCP] No servers configured.",
         "",
@@ -98,7 +101,7 @@ export async function handleMcp(
     "Commands: mcp_tools · mcp_call <tool> · mcp_connect <name> · mcp_add <template>",
   );
 
-  return text(lines.join("\n"));
+  return formatChatResult(lines.join("\n"));
 }
 
 // ── mcp_list ──────────────────────────────────────────────────────────────────
@@ -111,7 +114,7 @@ export async function handleMcpList(
   const servers = listServers();
 
   if (servers.length === 0) {
-    return text(
+    return formatChatResult(
       "[MCP] No servers registered. Use: mcp_add <name> <transport> <command>",
     );
   }
@@ -129,7 +132,7 @@ export async function handleMcpList(
     return `${String(i + 1).padStart(2)}. ${icon} ${s.name} [${transport}]\n       ${cmd}`;
   });
 
-  return text(
+  return formatChatResult(
     [
       `[MCP] ${servers.length} registered server${servers.length !== 1 ? "s" : ""}`,
       ...rows,
@@ -149,12 +152,12 @@ export async function handleMcpConnect(
   const name = stripVerb(input, ["mcp_connect", "mcp connect"]);
 
   if (!name) {
-    return text("Usage: mcp_connect <server-name>");
+    return formatChatResult("Usage: mcp_connect <server-name>");
   }
 
   const config = getServer(name);
   if (!config) {
-    return text(
+    return formatChatResult(
       `❌ Server "${name}" not found in registry. Use mcp_list to see registered servers.`,
     );
   }
@@ -166,7 +169,7 @@ export async function handleMcpConnect(
     const client = manager.getClient(name)!;
     const toolCount = client.tools.length;
 
-    return text(
+    return formatChatResult(
       [
         `✅ Connected to "${name}"`,
         client.serverInfo
@@ -184,7 +187,9 @@ export async function handleMcpConnect(
         .join("\n"),
     );
   } catch (err: any) {
-    return text(`❌ Failed to connect to "${name}"\n${err.message}`);
+    return formatChatResult(
+      `❌ Failed to connect to "${name}"\n${err.message}`,
+    );
   }
 }
 
@@ -198,12 +203,12 @@ export async function handleMcpDisconnect(
   const name = stripVerb(input, ["mcp_disconnect", "mcp disconnect"]);
 
   if (!name) {
-    return text("Usage: mcp_disconnect <server-name>");
+    return formatChatResult("Usage: mcp_disconnect <server-name>");
   }
 
   const manager = getMCPManager();
   await manager.disconnect(name);
-  return text(`✅ Disconnected from "${name}"`);
+  return formatChatResult(`✅ Disconnected from "${name}"`);
 }
 
 // ── mcp_add ───────────────────────────────────────────────────────────────────
@@ -217,7 +222,7 @@ export async function handleMcpAdd(
 
   if (!raw) {
     const templates = Object.keys(BUILTIN_SERVER_TEMPLATES).join(", ");
-    return text(
+    return formatChatResult(
       [
         "Usage:",
         "  mcp_add <template-name>",
@@ -246,22 +251,22 @@ export async function handleMcpAdd(
       try {
         await manager.connect(config);
         const client = manager.getClient(raw)!;
-        return text(
+        return formatChatResult(
           `✅ Added and connected template "${raw}"\n   Tools: ${client.tools.length}\n   Run: mcp_tools ${raw}`,
         );
       } catch (err: any) {
-        return text(
+        return formatChatResult(
           `✅ Template "${raw}" added to registry.\n⚠️  Auto-connect failed: ${err.message}\n   Run: mcp_connect ${raw}`,
         );
       }
     }
-    return text(`✅ Template "${raw}" added to registry.`);
+    return formatChatResult(`✅ Template "${raw}" added to registry.`);
   }
 
   // Parse: <name> <transport> <command/url> [args...]
   const parts = raw.split(/\s+/);
   if (parts.length < 3) {
-    return text(
+    return formatChatResult(
       "Usage: mcp_add <name> <stdio|sse|http> <command or url> [args...]\n" +
         "Example: mcp_add my-server stdio npx -y @modelcontextprotocol/server-filesystem /tmp",
     );
@@ -270,7 +275,7 @@ export async function handleMcpAdd(
   const [name, transport, ...rest] = parts;
 
   if (!["stdio", "sse", "http"].includes(transport)) {
-    return text(
+    return formatChatResult(
       `❌ Invalid transport "${transport}". Use: stdio, sse, or http`,
     );
   }
@@ -302,11 +307,11 @@ export async function handleMcpAdd(
   try {
     await manager.connect(config);
     const client = manager.getClient(name)!;
-    return text(
+    return formatChatResult(
       `✅ Added and connected "${name}"\n   Tools: ${client.tools.length}`,
     );
   } catch (err: any) {
-    return text(
+    return formatChatResult(
       `✅ Server "${name}" added to registry.\n⚠️  Auto-connect failed: ${err.message}\n   Run: mcp_connect ${name}`,
     );
   }
@@ -321,17 +326,17 @@ export async function handleMcpRemove(
 ): Promise<ChatResult> {
   const name = stripVerb(input, ["mcp_remove", "mcp remove"]);
 
-  if (!name) return text("Usage: mcp_remove <server-name>");
+  if (!name) return formatChatResult("Usage: mcp_remove <server-name>");
 
   const manager = getMCPManager();
   await manager.disconnect(name);
 
   const removed = removeServer(name);
   if (!removed) {
-    return text(`❌ Server "${name}" not found in registry.`);
+    return formatChatResult(`❌ Server "${name}" not found in registry.`);
   }
 
-  return text(`🗑️  Removed MCP server "${name}" from registry.`);
+  return formatChatResult(`🗑️  Removed MCP server "${name}" from registry.`);
 }
 
 // ── mcp_enable / mcp_disable ──────────────────────────────────────────────────
@@ -342,12 +347,14 @@ export async function handleMcpEnable(
   _model?: string,
 ): Promise<ChatResult> {
   const name = stripVerb(input, ["mcp_enable", "mcp enable"]);
-  if (!name) return text("Usage: mcp_enable <server-name>");
+  if (!name) return formatChatResult("Usage: mcp_enable <server-name>");
 
   const ok = enableServer(name, true);
-  if (!ok) return text(`❌ Server "${name}" not found.`);
+  if (!ok) return formatChatResult(`❌ Server "${name}" not found.`);
 
-  return text(`✅ Enabled server "${name}". Run: mcp_connect ${name}`);
+  return formatChatResult(
+    `✅ Enabled server "${name}". Run: mcp_connect ${name}`,
+  );
 }
 
 export async function handleMcpDisable(
@@ -356,15 +363,15 @@ export async function handleMcpDisable(
   _model?: string,
 ): Promise<ChatResult> {
   const name = stripVerb(input, ["mcp_disable", "mcp disable"]);
-  if (!name) return text("Usage: mcp_disable <server-name>");
+  if (!name) return formatChatResult("Usage: mcp_disable <server-name>");
 
   const manager = getMCPManager();
   await manager.disconnect(name);
 
   const ok = enableServer(name, false);
-  if (!ok) return text(`❌ Server "${name}" not found.`);
+  if (!ok) return formatChatResult(`❌ Server "${name}" not found.`);
 
-  return text(`⏸️  Disabled server "${name}".`);
+  return formatChatResult(`⏸️  Disabled server "${name}".`);
 }
 
 // ── mcp_tools ─────────────────────────────────────────────────────────────────
@@ -380,7 +387,7 @@ export async function handleMcpTools(
   const allTools = manager.getAllTools();
 
   if (allTools.length === 0) {
-    return text(
+    return formatChatResult(
       "[MCP] No tools available.\nConnect a server first: mcp_connect <name>",
     );
   }
@@ -390,7 +397,9 @@ export async function handleMcpTools(
     : allTools;
 
   if (filtered.length === 0) {
-    return text(`[MCP] No tools found for server "${serverFilter}".`);
+    return formatChatResult(
+      `[MCP] No tools found for server "${serverFilter}".`,
+    );
   }
 
   // Group by server
@@ -420,7 +429,7 @@ export async function handleMcpTools(
 
   lines.push("", 'Call a tool: mcp_call <tool-name> {"key":"value"}');
 
-  return text(lines.filter((l) => l !== "").join("\n"));
+  return formatChatResult(lines.filter((l) => l !== "").join("\n"));
 }
 
 // ── mcp_call ──────────────────────────────────────────────────────────────────
@@ -433,7 +442,7 @@ export async function handleMcpCall(
   const raw = stripVerb(input, ["mcp_call", "mcp call"]);
 
   if (!raw) {
-    return text(
+    return formatChatResult(
       "Usage: mcp_call <tool-name> [json-args]\n" +
         'Example: mcp_call read_file {"path":"./README.md"}\n' +
         "         mcp_call list_directory",
@@ -469,7 +478,7 @@ export async function handleMcpCall(
     const result = await manager.callTool(toolName, args);
     const status = result.isError ? "⚠️  Error" : "✅";
 
-    return text(
+    return formatChatResult(
       [
         `[MCP] ${status} ${toolName} (${result.serverName}, ${formatDuration(result.durationMs)})`,
         "─".repeat(50),
@@ -477,7 +486,9 @@ export async function handleMcpCall(
       ].join("\n"),
     );
   } catch (err: any) {
-    return text(`[MCP] ❌ Failed to call tool "${toolName}"\n${err.message}`);
+    return formatChatResult(
+      `[MCP] ❌ Failed to call tool "${toolName}"\n${err.message}`,
+    );
   }
 }
 
@@ -494,7 +505,7 @@ export async function handleMcpResources(
   const allResources = manager.getAllResources();
 
   if (allResources.length === 0) {
-    return text("[MCP] No resources available.");
+    return formatChatResult("[MCP] No resources available.");
   }
 
   const filtered = serverFilter
@@ -515,7 +526,7 @@ export async function handleMcpResources(
 
   lines.push("", "Read a resource: mcp_read <uri>");
 
-  return text(lines.filter((l) => l !== "").join("\n"));
+  return formatChatResult(lines.filter((l) => l !== "").join("\n"));
 }
 
 // ── mcp_read ──────────────────────────────────────────────────────────────────
@@ -527,15 +538,19 @@ export async function handleMcpRead(
 ): Promise<ChatResult> {
   const uri = stripVerb(input, ["mcp_read", "mcp read"]);
 
-  if (!uri) return text("Usage: mcp_read <resource-uri>");
+  if (!uri) return formatChatResult("Usage: mcp_read <resource-uri>");
 
   const manager = getMCPManager();
 
   try {
     const content = await manager.readResource(uri);
-    return text(`[MCP] Resource: ${uri}\n${"─".repeat(40)}\n${content}`);
+    return formatChatResult(
+      `[MCP] Resource: ${uri}\n${"─".repeat(40)}\n${content}`,
+    );
   } catch (err: any) {
-    return text(`[MCP] ❌ Failed to read resource "${uri}"\n${err.message}`);
+    return formatChatResult(
+      `[MCP] ❌ Failed to read resource "${uri}"\n${err.message}`,
+    );
   }
 }
 
@@ -552,7 +567,7 @@ export async function handleMcpPrompts(
   const allPrompts = manager.getAllPrompts();
 
   if (allPrompts.length === 0) {
-    return text("[MCP] No prompts available.");
+    return formatChatResult("[MCP] No prompts available.");
   }
 
   const filtered = serverFilter
@@ -574,5 +589,5 @@ export async function handleMcpPrompts(
     );
   }
 
-  return text(lines.filter((l) => l !== "").join("\n"));
+  return formatChatResult(lines.filter((l) => l !== "").join("\n"));
 }

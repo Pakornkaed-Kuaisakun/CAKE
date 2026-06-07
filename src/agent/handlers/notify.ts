@@ -1,7 +1,6 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { notify } from "../../modules/notify/index.js";
-import { text } from "../utils/text.js";
-import { stripVerb } from "../../shared/utils/utils.js";
+import { stripVerb, formatChatResult } from "../../shared/utils/utils.js";
 
 export async function handleNotify(
   _provider: AIProvider,
@@ -10,17 +9,17 @@ export async function handleNotify(
 ): Promise<ChatResult> {
   // Extract message from input (e.g., "notify take a pill" -> "take a pill")
   const message = stripVerb(input, ["notify", "remind", "alert"]);
-  
-  if (!message) return text("Please specify what to notify.");
+
+  if (!message) return formatChatResult("Please specify what to notify.");
 
   notify({
     title: "🍰 CAKE Reminder",
     message: message,
     sound: true,
-    wait: false
+    wait: false,
   });
 
-  return text(`Bell Notification sent: "${message}"`);
+  return formatChatResult(`Bell Notification sent: "${message}"`);
 }
 
 export async function handleTestNotify(
@@ -31,9 +30,10 @@ export async function handleTestNotify(
   notify({
     title: "🍰 CAKE Test Notification",
     message: "This is a test notification from CAKE! It works! 🎉",
-    sound: true
+    sound: true,
   });
 
-  return text("🔔 Test notification sent! Check your desktop alerts.");
+  return formatChatResult(
+    "🔔 Test notification sent! Check your desktop alerts.",
+  );
 }
-

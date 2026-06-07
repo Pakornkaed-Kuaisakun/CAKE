@@ -6,8 +6,11 @@ import {
   chunkText,
   askDocument,
 } from "../../modules/documents/index.js";
-import { text } from "../utils/text.js";
-import { calculateScore, stripQuotes } from "../../shared/utils/utils.js";
+import {
+  calculateScore,
+  stripQuotes,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 export async function handleReadDocument(
   _provider: AIProvider,
@@ -16,7 +19,7 @@ export async function handleReadDocument(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:read|open|show)\s+(.+)/i);
-    if (!match) return text("Please specify a document path.");
+    if (!match) return formatChatResult("Please specify a document path.");
 
     const rawPath = stripQuotes(match[1]);
     const filePath = path.resolve(rawPath);
@@ -26,7 +29,7 @@ export async function handleReadDocument(
       text: `[DOCUMENTS] ${rawPath}\n\n` + content.slice(0, 12000),
     };
   } catch (error: any) {
-    return text(`Failed to read document.\n${error.message}`);
+    return formatChatResult(`Failed to read document.\n${error.message}`);
   }
 }
 
@@ -37,7 +40,7 @@ export async function handleSummarizeDocument(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:summarize|summary)\s+(.+)/i);
-    if (!match) return text("Please provide a file path");
+    if (!match) return formatChatResult("Please provide a file path");
 
     const rawPath = stripQuotes(match[1]);
     const filePath = path.resolve(rawPath);
@@ -49,7 +52,7 @@ export async function handleSummarizeDocument(
       text: `[DOCUMENTS] Summary: ${rawPath}\n\n` + summary.text,
     };
   } catch (err: any) {
-    return text(`Failed to summarize document.\n${err.message}`);
+    return formatChatResult(`Failed to summarize document.\n${err.message}`);
   }
 }
 
@@ -65,7 +68,7 @@ export async function handleAskDocument(
 
     if (!match) {
       // หากไม่มีชื่อไฟล์ ให้แนะนำสั้นๆ และบอกว่ากำลังจะเข้าสู่โหมด Chat ปกติ
-      return text(
+      return formatChatResult(
         "I couldn't find a document to ask. To ask a specific file, use: ask <filename.pdf> <question>\n\n(Falling back to general chat...)",
       );
     }
@@ -75,7 +78,7 @@ export async function handleAskDocument(
     const filePath = path.resolve(rawPath);
 
     const content = await readDocument(filePath);
-    if (!content?.trim()) return text("Document is empty");
+    if (!content?.trim()) return formatChatResult("Document is empty");
 
     const chunks = chunkText(content, 6000, 500);
     const relevantChunks = chunks
@@ -95,6 +98,6 @@ export async function handleAskDocument(
       text: `[DOCUMENTS] ${rawPath}\nQuestion: ${question}\n\n${response.text}`,
     };
   } catch (err: any) {
-    return text(`Failed to ask document.\n${err.message}`);
+    return formatChatResult(`Failed to ask document.\n${err.message}`);
   }
 }

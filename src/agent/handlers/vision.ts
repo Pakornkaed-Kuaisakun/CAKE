@@ -16,7 +16,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -274,14 +274,14 @@ export async function handleScreenshot(
 ): Promise<ChatResult> {
   const platform = detectPlatform();
   if (platform === "unsupported") {
-    return text(
+    return formatChatResult(
       `[VISION] Unsupported platform: ${process.platform}.\n` +
         `Screenshot capture requires macOS, Linux, or Windows.`,
     );
   }
 
   if (!supportsVision(provider.name)) {
-    return text(
+    return formatChatResult(
       `[VISION] Provider "${provider.name}" does not support vision/image analysis.\n` +
         `Switch to claude, openai, or gemini with: /provider claude`,
     );
@@ -296,14 +296,14 @@ export async function handleScreenshot(
     captureScreen(tmpFile, args.region);
     captureMs = Date.now() - t0;
   } catch (err: any) {
-    return text(
+    return formatChatResult(
       `[VISION] Screen capture failed.\n${err.message}\n\n` +
         installHint(platform),
     );
   }
 
   if (!fs.existsSync(tmpFile)) {
-    return text(
+    return formatChatResult(
       `[VISION] Screenshot tool ran but produced no output at: ${tmpFile}`,
     );
   }
@@ -342,7 +342,7 @@ export async function handleScreenshot(
     try {
       fs.unlinkSync(tmpFile);
     } catch {}
-    return text(`[VISION] Analysis failed.\n${err.message}`);
+    return formatChatResult(`[VISION] Analysis failed.\n${err.message}`);
   }
 
   try {
@@ -359,7 +359,7 @@ export async function handleScreenshot(
     .filter(Boolean)
     .join(" · ");
 
-  return text(`${header}\n${"─".repeat(50)}\n${analysis}`);
+  return formatChatResult(`${header}\n${"─".repeat(50)}\n${analysis}`);
 }
 
 // ── Install hint ──────────────────────────────────────────────────────────────

@@ -22,7 +22,7 @@ import {
   type OperationCategory,
   type PermissionLevel,
 } from "../permissions/index.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 const VALID_CATEGORIES = new Set<OperationCategory>([
   "bash",
@@ -61,7 +61,7 @@ export async function handlePermissionsCommand(
   // /permissions reset
   if (sub === "reset") {
     savePermissions({ ...DEFAULTS });
-    return text(
+    return formatChatResult(
       [
         `✅ All permissions reset to defaults.`,
         ``,
@@ -75,7 +75,7 @@ export async function handlePermissionsCommand(
   const level = args[1]?.toLowerCase() as PermissionLevel | undefined;
 
   if (!VALID_CATEGORIES.has(category)) {
-    return text(
+    return formatChatResult(
       [
         `Unknown category: "${category}"`,
         `Valid categories: ${[...VALID_CATEGORIES].join(", ")}`,
@@ -89,7 +89,7 @@ export async function handlePermissionsCommand(
   if (!level || !VALID_LEVELS.has(level)) {
     // Show current level for that category
     const current = loadPermissions()[category];
-    return text(
+    return formatChatResult(
       [
         `${CATEGORY_LABELS[category]}: ${LEVEL_ICONS[current]} ${current.toUpperCase()}`,
         ``,
@@ -99,7 +99,7 @@ export async function handlePermissionsCommand(
   }
 
   setPermission(category, level);
-  return text(
+  return formatChatResult(
     [
       `✅ ${CATEGORY_LABELS[category]} → ${LEVEL_ICONS[level]} ${level.toUpperCase()}`,
       `Stored in: ${permissionsFilePath()}`,
@@ -109,7 +109,7 @@ export async function handlePermissionsCommand(
 
 function showTable(): ChatResult {
   const perms = loadPermissions();
-  return text(
+  return formatChatResult(
     [
       `🔐 CAKE Permission Levels`,
       `File: ${permissionsFilePath()}`,

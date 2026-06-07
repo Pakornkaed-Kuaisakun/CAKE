@@ -5,11 +5,13 @@ import {
   deleteEvent,
 } from "../../modules/calendar/index.js";
 import { exactEvent } from "../../shared/helpers/calendar.js";
-import { text } from "../utils/text.js";
 import fs from "fs";
 import path from "path";
 import { CAKE_DIR } from "../../config/constants.js";
-import { parseJsonMarkdown } from "../../shared/utils/utils.js";
+import {
+  parseJsonMarkdown,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 const CALENDAR_CACHE_DIR = path.join(CAKE_DIR, "cache");
 const CALENDAR_CACHE_FILE = path.join(
@@ -36,7 +38,7 @@ export async function handleCalendarList(
     // non-fatal — autocomplete just won't show IDs if write fails
   }
 
-  if (events.length === 0) return text("No upcoming events found.");
+  if (events.length === 0) return formatChatResult("No upcoming events found.");
 
   const out = events
     .map(
@@ -45,7 +47,7 @@ export async function handleCalendarList(
     )
     .join("\n");
 
-  return text(`[CALENDAR] Upcoming events:\n${out}`);
+  return formatChatResult(`[CALENDAR] Upcoming events:\n${out}`);
 }
 
 export async function handleCalendarCreate(
@@ -107,13 +109,13 @@ export async function handleCalendarRemove(
   _model?: string,
 ): Promise<ChatResult> {
   const match = input.match(/\b[0-9a-f]{26}\b/);
-  if (!match) return text("Please provide a valid Event ID.");
+  if (!match) return formatChatResult("Please provide a valid Event ID.");
 
   const eventId = match[0];
 
   try {
     await deleteEvent(eventId);
-    return text(`✅ Event deleted: ${eventId}`);
+    return formatChatResult(`✅ Event deleted: ${eventId}`);
   } catch (err: any) {
     return { text: `Failed to delete event.\n${err.message}` };
   }

@@ -16,7 +16,6 @@
 //   tq_drain                — wait for all tasks to finish (reports when done)
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import {
   getTaskQueue,
   type TaskPriority,
@@ -24,7 +23,13 @@ import {
 } from "../taskQueue.js";
 import { getFastModel } from "../../providers/utils.js";
 
-import { fmtMs, fmtAge, fmtDate, stripVerb } from "../../shared/utils/utils.js";
+import {
+  fmtMs,
+  fmtAge,
+  fmtDate,
+  stripVerb,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 const PRIORITY_ICONS: Record<TaskPriority, string> = {
   critical: "🔴",
@@ -77,7 +82,7 @@ export async function handleTqAdd(
   const raw = stripVerb(input, ["tq_add", "task_queue_add", "tq add"]);
 
   if (!raw) {
-    return text(
+    return formatChatResult(
       "Usage: tq_add <description> [--priority critical|high|medium|low] [--retries N] [--timeout Ns]\n" +
         "Example: tq_add Sync database --priority high --retries 3 --timeout 60s",
     );
@@ -115,7 +120,7 @@ export async function handleTqAdd(
     .trim();
 
   if (!description) {
-    return text("Please provide a task description.");
+    return formatChatResult("Please provide a task description.");
   }
 
   const queue = getTaskQueue();
@@ -139,7 +144,7 @@ export async function handleTqAdd(
   );
 
   const task = queue.get(id)!;
-  return text(
+  return formatChatResult(
     `✅ Task queued\n` +
       `   ID       : ${id}\n` +
       `   Priority : ${PRIORITY_ICONS[priority]} ${priority}\n` +
@@ -179,7 +184,7 @@ export async function handleTqList(
   const tasks = queue.list(filter);
 
   if (tasks.length === 0) {
-    return text(
+    return formatChatResult(
       filter ? `No ${filter} tasks in queue.` : "Task queue is empty.",
     );
   }
@@ -212,7 +217,7 @@ export async function handleTqList(
   const stats = queue.stats();
   const header = `[TASK QUEUE] ${tasks.length} task${tasks.length !== 1 ? "s" : ""} · ${stats.running} running · ${stats.pending} pending · concurrency: ${stats.concurrency}${stats.paused ? " · PAUSED" : ""}`;
 
-  return text([header, "", ...sections].join("\n"));
+  return formatChatResult([header, "", ...sections].join("\n"));
 }
 
 // ── tq_status ─────────────────────────────────────────────────────────────────
@@ -222,7 +227,7 @@ export async function handleTqStatus(
   input: string,
 ): Promise<ChatResult> {
   const id = stripVerb(input, ["tq_status", "tq status"]);
-  if (!id) return text("Usage: tq_status <task-id>");
+  if (!id) return formatChatResult("Usage: tq_status <task-id>");
 
   const queue = getTaskQueue();
 
@@ -231,7 +236,9 @@ export async function handleTqStatus(
   const task = allTasks.find((t) => t.id === id || t.id.startsWith(id));
 
   if (!task)
-    return text(`Task not found: ${id}\nRun tq_list to see all tasks.`);
+    return formatChatResult(
+      `Task not found: ${id}\nRun tq_list to see all tasks.`,
+    );
 
   const lines = [
     `[TASK] ${STATUS_ICONS[task.status]} ${task.description}`,
@@ -265,7 +272,7 @@ export async function handleTqStatus(
     .filter(Boolean)
     .join("\n");
 
-  return text(lines);
+  return formatChatResult(lines);
 }
 
 // ── tq_cancel ─────────────────────────────────────────────────────────────────
@@ -275,15 +282,15 @@ export async function handleTqCancel(
   input: string,
 ): Promise<ChatResult> {
   const id = stripVerb(input, ["tq_cancel", "tq cancel"]);
-  if (!id) return text("Usage: tq_cancel <task-id>");
+  if (!id) return formatChatResult("Usage: tq_cancel <task-id>");
 
   const queue = getTaskQueue();
   const allTasks = queue.list();
   const task = allTasks.find((t) => t.id === id || t.id.startsWith(id));
-  if (!task) return text(`Task not found: ${id}`);
+  if (!task) return formatChatResult(`Task not found: ${id}`);
 
   const ok = queue.cancel(task.id);
-  return text(
+  return formatChatResult(
     ok
       ? `🚫 Task cancelled: "${task.description}" [${task.id.slice(0, 8)}]`
       : `Cannot cancel task in status "${task.status}".`,
@@ -301,15 +308,17 @@ export async function handleTqPause(
 
   if (!id) {
     queue.pauseAll();
-    return text("⏸ Queue paused. No new tasks will start until resumed.");
+    return formatChatResult(
+      "⏸ Queue paused. No new tasks will start until resumed.",
+    );
   }
 
   const allTasks = queue.list();
   const task = allTasks.find((t) => t.id === id || t.id.startsWith(id));
-  if (!task) return text(`Task not found: ${id}`);
+  if (!task) return formatChatResult(`Task not found: ${id}`);
 
   const ok = queue.pause(task.id);
-  return text(
+  return formatChatResult(
     ok
       ? `⏸ Task paused: "${task.description}" [${task.id.slice(0, 8)}]`
       : `Cannot pause task in status "${task.status}".`,
@@ -327,15 +336,15 @@ export async function handleTqResume(
 
   if (!id) {
     queue.resumeAll();
-    return text("▶ Queue resumed.");
+    return formatChatResult("▶ Queue resumed.");
   }
 
   const allTasks = queue.list();
   const task = allTasks.find((t) => t.id === id || t.id.startsWith(id));
-  if (!task) return text(`Task not found: ${id}`);
+  if (!task) return formatChatResult(`Task not found: ${id}`);
 
   const ok = queue.resume(task.id);
-  return text(
+  return formatChatResult(
     ok
       ? `▶ Task resumed: "${task.description}" [${task.id.slice(0, 8)}]`
       : `Cannot resume task in status "${task.status}".`,
@@ -350,19 +359,19 @@ export async function handleTqRetry(
   model?: string,
 ): Promise<ChatResult> {
   const id = stripVerb(input, ["tq_retry", "tq retry"]);
-  if (!id) return text("Usage: tq_retry <task-id>");
+  if (!id) return formatChatResult("Usage: tq_retry <task-id>");
 
   const queue = getTaskQueue();
   const allTasks = queue.list();
   const task = allTasks.find((t) => t.id === id || t.id.startsWith(id));
-  if (!task) return text(`Task not found: ${id}`);
+  if (!task) return formatChatResult(`Task not found: ${id}`);
 
   if (
     task.status !== "failed" &&
     task.status !== "timeout" &&
     task.status !== "cancelled"
   ) {
-    return text(
+    return formatChatResult(
       `Cannot retry task in status "${task.status}". Only failed/timeout/cancelled tasks can be retried.`,
     );
   }
@@ -386,7 +395,7 @@ export async function handleTqRetry(
     },
   );
 
-  return text(
+  return formatChatResult(
     `🔄 Retried task\n` +
       `   Original : ${task.id.slice(0, 8)}\n` +
       `   New ID   : ${newId}\n` +
@@ -403,14 +412,16 @@ export async function handleTqPriority(
   const raw = stripVerb(input, ["tq_priority", "tq priority"]);
   const parts = raw.split(/\s+/);
   if (parts.length < 2) {
-    return text("Usage: tq_priority <task-id> <critical|high|medium|low>");
+    return formatChatResult(
+      "Usage: tq_priority <task-id> <critical|high|medium|low>",
+    );
   }
 
   const [idPrefix, levelRaw] = parts;
   const level = levelRaw?.toLowerCase() as TaskPriority;
 
   if (!["critical", "high", "medium", "low"].includes(level)) {
-    return text(
+    return formatChatResult(
       `Invalid priority "${levelRaw}". Use: critical | high | medium | low`,
     );
   }
@@ -420,10 +431,10 @@ export async function handleTqPriority(
   const task = allTasks.find(
     (t) => t.id === idPrefix || t.id.startsWith(idPrefix),
   );
-  if (!task) return text(`Task not found: ${idPrefix}`);
+  if (!task) return formatChatResult(`Task not found: ${idPrefix}`);
 
   const ok = queue.reprioritize(task.id, level);
-  return text(
+  return formatChatResult(
     ok
       ? `✅ Priority updated: "${task.description}" → ${PRIORITY_ICONS[level]} ${level}`
       : `Cannot reprioritize task in status "${task.status}". Only pending tasks can be reprioritized.`,
@@ -438,7 +449,7 @@ export async function handleTqPurge(
 ): Promise<ChatResult> {
   const queue = getTaskQueue();
   const count = queue.purge();
-  return text(
+  return formatChatResult(
     count > 0
       ? `🗑️  Purged ${count} terminal task${count !== 1 ? "s" : ""} from the registry.`
       : "Nothing to purge — no completed/failed/cancelled tasks found.",
@@ -477,7 +488,7 @@ export async function handleTqStats(
     "Commands: tq_list · tq_pause · tq_resume · tq_purge",
   ];
 
-  return text(lines.join("\n"));
+  return formatChatResult(lines.join("\n"));
 }
 
 // ── tq_drain ──────────────────────────────────────────────────────────────────
@@ -490,17 +501,17 @@ export async function handleTqDrain(
   const s = queue.stats();
 
   if (s.pending === 0 && s.running === 0) {
-    return text("Queue is already empty — nothing to drain.");
+    return formatChatResult("Queue is already empty — nothing to drain.");
   }
 
   const count = s.pending + s.running;
   try {
     await queue.drain();
-    return text(
+    return formatChatResult(
       `✅ Queue drained. All ${count} task${count !== 1 ? "s" : ""} finished.`,
     );
   } catch (err: any) {
-    return text(
+    return formatChatResult(
       `⚠️ Drain timed out: ${err.message}\nSome tasks may still be running.`,
     );
   }

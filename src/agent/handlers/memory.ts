@@ -2,9 +2,8 @@ import path from "path";
 import type { AIProvider, ChatResult, Message } from "../../providers/types.js";
 import { readDocument, chunkText } from "../../modules/documents/index.js";
 import { MemoryManager } from "../../modules/memory/index.js";
-import { text } from "../utils/text.js";
 import { EpisodeStore, DecisionStore } from "../../modules/memory/episodes.js";
-import { stripQuotes } from "../../shared/utils/utils.js";
+import { stripQuotes, formatChatResult } from "../../shared/utils/utils.js";
 
 export async function handleIndexDocument(
   provider: AIProvider,
@@ -13,7 +12,7 @@ export async function handleIndexDocument(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:index|learn|remember)\s+(.+)/i);
-    if (!match) return text("Please specify a document to index.");
+    if (!match) return formatChatResult("Please specify a document to index.");
 
     const rawPath = stripQuotes(match[1]);
     const filePath = path.resolve(rawPath);
@@ -32,11 +31,11 @@ export async function handleIndexDocument(
       });
     }
 
-    return text(
+    return formatChatResult(
       `✅ Learned ${chunks.length} segments from ${path.basename(filePath)}. I will remember this context in future conversations.`,
     );
   } catch (error: any) {
-    return text(`Failed to index document.\n${error.message}`);
+    return formatChatResult(`Failed to index document.\n${error.message}`);
   }
 }
 
@@ -45,7 +44,7 @@ export async function handleForgetMemory(
   _input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  return text(
+  return formatChatResult(
     "Memory clearing feature is not implemented yet but can be done by deleting data/memory/vectors.json",
   );
 }
@@ -57,19 +56,20 @@ export async function handleMemorySearch(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:memory_search|memory search)\s+(.+)/i);
-    if (!match) return text("Please specify a query for memory_search.");
+    if (!match)
+      return formatChatResult("Please specify a query for memory_search.");
 
     const query = match[1].trim();
     const memory = new MemoryManager(provider);
     const results = await memory.retrieve(query, 5);
 
     if (!results || results.length === 0)
-      return text("No relevant long-term memories found.");
+      return formatChatResult("No relevant long-term memories found.");
 
     const body = results.map((r, i) => `${i + 1}. ${r}`).join("\n\n");
-    return text(`Found ${results.length} memory items:\n\n${body}`);
+    return formatChatResult(`Found ${results.length} memory items:\n\n${body}`);
   } catch (err: any) {
-    return text(`Memory search failed: ${err.message}`);
+    return formatChatResult(`Memory search failed: ${err.message}`);
   }
 }
 
@@ -80,7 +80,8 @@ export async function handleSessionSearch(
 ): Promise<ChatResult> {
   try {
     const match = input.match(/(?:session_search|session search)\s+(.+)/i);
-    if (!match) return text("Please specify a query for session_search.");
+    if (!match)
+      return formatChatResult("Please specify a query for session_search.");
 
     const query = match[1].trim();
     const memory = new MemoryManager(provider);
@@ -88,12 +89,14 @@ export async function handleSessionSearch(
     const results = await (memory as any).retrieveSession(query, 24, 5);
 
     if (!results || results.length === 0)
-      return text("No recent session memories found.");
+      return formatChatResult("No recent session memories found.");
 
     const body = results.map((r: any, i: any) => `${i + 1}. ${r}`).join("\n\n");
-    return text(`Found ${results.length} recent memory items:\n\n${body}`);
+    return formatChatResult(
+      `Found ${results.length} recent memory items:\n\n${body}`,
+    );
   } catch (err: any) {
-    return text(`Session memory search failed: ${err.message}`);
+    return formatChatResult(`Session memory search failed: ${err.message}`);
   }
 }
 
@@ -105,16 +108,16 @@ export async function handleEpisodeStart(
   try {
     const match = input.match(/(?:episode_start|start episode)\s+(.+)/i);
     if (!match)
-      return text(
+      return formatChatResult(
         "Please provide an episode title. Usage: episode_start <title>",
       );
 
     const title = match[1].trim();
     const store = new EpisodeStore();
     const ep = store.startEpisode(title, { createdBy: "user" });
-    return text(`Started episode '${title}' (id: ${ep.id}).`);
+    return formatChatResult(`Started episode '${title}' (id: ${ep.id}).`);
   } catch (err: any) {
-    return text(`Failed to start episode: ${err.message}`);
+    return formatChatResult(`Failed to start episode: ${err.message}`);
   }
 }
 
@@ -126,7 +129,7 @@ export async function handleEpisodeEnd(
   try {
     const match = input.match(/(?:episode_end|end episode)\s+([\w-]+)/i);
     if (!match)
-      return text(
+      return formatChatResult(
         "Please provide an episode id. Usage: episode_end <id> [summary]",
       );
 
@@ -138,10 +141,10 @@ export async function handleEpisodeEnd(
 
     const store = new EpisodeStore();
     const ep = store.endEpisode(id, summary);
-    if (!ep) return text(`Episode id not found: ${id}`);
-    return text(`Ended episode '${ep.title}' (id: ${ep.id}).`);
+    if (!ep) return formatChatResult(`Episode id not found: ${id}`);
+    return formatChatResult(`Ended episode '${ep.title}' (id: ${ep.id}).`);
   } catch (err: any) {
-    return text(`Failed to end episode: ${err.message}`);
+    return formatChatResult(`Failed to end episode: ${err.message}`);
   }
 }
 
@@ -153,13 +156,13 @@ export async function handleEpisodeList(
   try {
     const store = new EpisodeStore();
     const list = store.listEpisodes();
-    if (!list.length) return text("No episodes recorded.");
+    if (!list.length) return formatChatResult("No episodes recorded.");
     const body = list
       .map((e) => `- ${e.title} (id: ${e.id}) ${e.end ? `ended` : `active`}`)
       .join("\n");
-    return text(`Episodes:\n${body}`);
+    return formatChatResult(`Episodes:\n${body}`);
   } catch (err: any) {
-    return text(`Failed to list episodes: ${err.message}`);
+    return formatChatResult(`Failed to list episodes: ${err.message}`);
   }
 }
 
@@ -171,7 +174,7 @@ export async function handleDecisionRecord(
   try {
     const match = input.match(/(?:decision_record|record decision)\s+(.+)/i);
     if (!match)
-      return text(
+      return formatChatResult(
         "Please provide a decision text. Usage: decision_record <text> [--episode=<id>] [--rationale=<text>]",
       );
 
@@ -207,9 +210,9 @@ export async function handleDecisionRecord(
       recordedBy: "user",
       linkedMemoryIds: linked,
     });
-    return text(`Recorded decision (id: ${d.id}).`);
+    return formatChatResult(`Recorded decision (id: ${d.id}).`);
   } catch (err: any) {
-    return text(`Failed to record decision: ${err.message}`);
+    return formatChatResult(`Failed to record decision: ${err.message}`);
   }
 }
 
@@ -227,16 +230,16 @@ export async function handleDecisionList(
     const list = episodeId
       ? store.listForEpisode(episodeId)
       : store.listDecisions(50);
-    if (!list.length) return text("No decisions recorded.");
+    if (!list.length) return formatChatResult("No decisions recorded.");
     const body = list
       .map(
         (d) =>
           `- ${new Date(d.timestamp).toISOString()} ${d.episodeId ? `(ep:${d.episodeId}) ` : ""}${d.text}${d.rationale ? ` — rationale: ${d.rationale}` : ""}`,
       )
       .join("\n\n");
-    return text(`Decisions:\n\n${body}`);
+    return formatChatResult(`Decisions:\n\n${body}`);
   } catch (err: any) {
-    return text(`Failed to list decisions: ${err.message}`);
+    return formatChatResult(`Failed to list decisions: ${err.message}`);
   }
 }
 
@@ -258,11 +261,11 @@ export async function handleSelfReflect(
     // call reflectAndUpdate on TieredMemoryManager
     const updated = await (memory as any).reflectAndUpdate(model, limit);
 
-    return text(
+    return formatChatResult(
       `Self-reflection completed. Updated ${updated} memory entries.`,
     );
   } catch (err: any) {
-    return text(`Self-reflection failed: ${err.message}`);
+    return formatChatResult(`Self-reflection failed: ${err.message}`);
   }
 }
 
@@ -276,16 +279,18 @@ export async function handleEpisodeSummary(
       /(?:episode_summary|summary episode)\s+([\w-]+)/i,
     );
     if (!match)
-      return text("Please provide an episode id. Usage: episode_summary <id>");
+      return formatChatResult(
+        "Please provide an episode id. Usage: episode_summary <id>",
+      );
 
     const id = match[1];
     const store = new EpisodeStore();
     const ep = store.getEpisode(id);
-    if (!ep) return text(`Episode not found: ${id}`);
+    if (!ep) return formatChatResult(`Episode not found: ${id}`);
 
     const msgs = store.readMessages(id);
     if (!msgs || msgs.length === 0)
-      return text("No messages found for this episode.");
+      return formatChatResult("No messages found for this episode.");
 
     // Build content for summarization (cap length)
     const joined = msgs
@@ -312,11 +317,11 @@ export async function handleEpisodeSummary(
     if (result && result.text) {
       // Save summary back to episode
       store.endEpisode(id, result.text);
-      return text(`Episode summary:\n\n${result.text}`);
+      return formatChatResult(`Episode summary:\n\n${result.text}`);
     }
 
-    return text("Failed to summarize episode.");
+    return formatChatResult("Failed to summarize episode.");
   } catch (err: any) {
-    return text(`Episode summary failed: ${err.message}`);
+    return formatChatResult(`Episode summary failed: ${err.message}`);
   }
 }

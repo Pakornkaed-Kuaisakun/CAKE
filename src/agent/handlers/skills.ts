@@ -9,7 +9,6 @@
 //   /skills test <name> <input>  — test-run a skill against input
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import {
   getSkills,
   getSkillByName,
@@ -18,6 +17,7 @@ import {
 } from "../skills/registry.js";
 import { loadAllSkills } from "../skills/loader.js";
 import { registerSkills } from "../skills/registry.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 function fmtList(items: string[]): string {
   return items.map((i) => `  - ${i}`).join("\n");
@@ -35,7 +35,7 @@ export async function handleSkillsCommand(
     const skills = getSkills();
 
     if (skills.length === 0) {
-      return text(
+      return formatChatResult(
         [
           "[SKILLS] No skills loaded.",
           "",
@@ -76,7 +76,7 @@ export async function handleSkillsCommand(
       );
     });
 
-    return text(
+    return formatChatResult(
       [
         `[SKILLS] ${skills.length} skill${skills.length !== 1 ? "s" : ""} loaded`,
         "─".repeat(50),
@@ -90,11 +90,11 @@ export async function handleSkillsCommand(
   // ── /skills info <name> ───────────────────────────────────────────────────
   if (sub === "info" || sub === "show") {
     const name = args[1];
-    if (!name) return text("Usage: /skills info <skill-name>");
+    if (!name) return formatChatResult("Usage: /skills info <skill-name>");
 
     const skill = getSkillByName(name);
     if (!skill) {
-      return text(
+      return formatChatResult(
         `❌ Skill "${name}" not found.\nRun /skills to see available skills.`,
       );
     }
@@ -190,14 +190,14 @@ export async function handleSkillsCommand(
     lines.push("", `Loaded at: ${skill.loadedAt}`);
     lines.push(`Directory : ${skill.dir}`);
 
-    return text(lines.join("\n"));
+    return formatChatResult(lines.join("\n"));
   }
 
   // ── /skills reload ────────────────────────────────────────────────────────
   if (sub === "reload") {
     const freshSkills = loadAllSkills();
     registerSkills(freshSkills);
-    return text(
+    return formatChatResult(
       freshSkills.length > 0
         ? `✅ Reloaded ${freshSkills.length} skill${freshSkills.length !== 1 ? "s" : ""}: ` +
             freshSkills.map((s) => s.meta.name).join(", ")
@@ -208,11 +208,11 @@ export async function handleSkillsCommand(
   // ── /skills match <input> ─────────────────────────────────────────────────
   if (sub === "match") {
     const input = args.slice(1).join(" ");
-    if (!input) return text("Usage: /skills match <input text>");
+    if (!input) return formatChatResult("Usage: /skills match <input text>");
 
     const matches = matchSkills(input);
     if (matches.length === 0) {
-      return text(`No skills matched for: "${input}"`);
+      return formatChatResult(`No skills matched for: "${input}"`);
     }
 
     const rows = matches.map((s, i) => {
@@ -223,7 +223,7 @@ export async function handleSkillsCommand(
 
       return `${i + 1}. ${s.meta.name} — ${desc}`;
     });
-    return text(
+    return formatChatResult(
       `[SKILLS] ${matches.length} skill(s) matched "${input}":\n${rows.join("\n")}`,
     );
   }
@@ -231,13 +231,13 @@ export async function handleSkillsCommand(
   // ── /skills context <name> ────────────────────────────────────────────────
   if (sub === "context") {
     const name = args[1];
-    if (!name) return text("Usage: /skills context <skill-name>");
+    if (!name) return formatChatResult("Usage: /skills context <skill-name>");
 
     const skill = getSkillByName(name);
-    if (!skill) return text(`Skill "${name}" not found.`);
+    if (!skill) return formatChatResult(`Skill "${name}" not found.`);
 
     const ctx = buildSkillContext(skill);
-    return text(
+    return formatChatResult(
       ctx
         ? `[SKILL CONTEXT: ${name}]\n${"─".repeat(40)}\n${ctx}`
         : `Skill "${name}" produces no context.`,
@@ -245,7 +245,7 @@ export async function handleSkillsCommand(
   }
 
   // ── Unknown ───────────────────────────────────────────────────────────────
-  return text(
+  return formatChatResult(
     [
       `Unknown sub-command: /skills ${sub}`,
       "",

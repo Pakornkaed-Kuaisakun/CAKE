@@ -1,13 +1,13 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { CronManager } from "../../modules/cron/index.js";
-import { text } from "../utils/text.js";
-
 import { getFastModel } from "../../providers/utils.js";
-import { parseJsonMarkdown } from "../../shared/utils/utils.js";
+import {
+  parseJsonMarkdown,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 // Singleton manager instance - ในระบบจริงควรส่งผ่าน Agent
 let manager: CronManager | null = null;
-
 
 export function initCronManager(executeCallback: (job: any) => Promise<void>) {
   manager = new CronManager(executeCallback);
@@ -20,7 +20,7 @@ export async function handleScheduleTask(
   input: string,
   model?: string,
 ): Promise<ChatResult> {
-  if (!manager) return text("Cron system not initialized.");
+  if (!manager) return formatChatResult("Cron system not initialized.");
 
   // ให้ AI ช่วยตีความเวลาและเนื้อหางาน
   const prompt = `
@@ -36,18 +36,22 @@ export async function handleScheduleTask(
   `;
 
   const fastModel = model || getFastModel(provider.name);
-  const response = await provider.chat([{ role: "user", content: prompt }], { 
-    model: fastModel 
+  const response = await provider.chat([{ role: "user", content: prompt }], {
+    model: fastModel,
   });
-  
+
   try {
     const data = parseJsonMarkdown(response.text);
 
     const job = await manager.addJob(data.name, data.cronExpression, data.task);
 
-    return text(`✅ Scheduled: "${job.name}"\n📅 Cron: ${job.cronExpression}\n📝 Task: ${job.taskDescription}`);
+    return formatChatResult(
+      `✅ Scheduled: "${job.name}"\n📅 Cron: ${job.cronExpression}\n📝 Task: ${job.taskDescription}`,
+    );
   } catch (err) {
-    return text(`Failed to parse schedule request.\nAI Response: ${response.text}`);
+    return formatChatResult(
+      `Failed to parse schedule request.\nAI Response: ${response.text}`,
+    );
   }
 }
 
@@ -56,12 +60,19 @@ export async function handleListCron(
   _input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  if (!manager) return text("Cron system not initialized.");
+  if (!manager) return formatChatResult("Cron system not initialized.");
   const jobs = manager.listJobs();
-  if (jobs.length === 0) return text("No scheduled jobs found.");
+  if (jobs.length === 0) return formatChatResult("No scheduled jobs found.");
 
-  const list = jobs.map(j => `• [${j.id}] ${j.name}\n  Time: ${j.cronExpression}\n  Task: ${j.taskDescription}`).join("\n\n");
-  return text(`🕒 Active Cron Jobs:\n\n${list}\n\nTip: Use "remove job <id>" to delete a task.`);
+  const list = jobs
+    .map(
+      (j) =>
+        `• [${j.id}] ${j.name}\n  Time: ${j.cronExpression}\n  Task: ${j.taskDescription}`,
+    )
+    .join("\n\n");
+  return formatChatResult(
+    `🕒 Active Cron Jobs:\n\n${list}\n\nTip: Use "remove job <id>" to delete a task.`,
+  );
 }
 
 export async function handleRemoveCron(
@@ -69,14 +80,15 @@ export async function handleRemoveCron(
   input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  if (!manager) return text("Cron system not initialized.");
+  if (!manager) return formatChatResult("Cron system not initialized.");
 
-  const match = input.match(/(?:remove|delete|cancel)\s+(?:job|task|cron)\s+(\S+)/i);
-  if (!match) return text('Usage: remove job <id>');
+  const match = input.match(
+    /(?:remove|delete|cancel)\s+(?:job|task|cron)\s+(\S+)/i,
+  );
+  if (!match) return formatChatResult("Usage: remove job <id>");
 
   const id = match[1].trim();
   manager.removeJob(id);
 
-  return text(`✅ Job [${id}] has been removed.`);
+  return formatChatResult(`✅ Job [${id}] has been removed.`);
 }
-

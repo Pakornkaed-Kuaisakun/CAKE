@@ -10,7 +10,7 @@
 //   /memory clear    — reset the current session's episode tracking
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 import { EpisodeStore, DecisionStore } from "../../modules/memory/episodes.js";
 import { CAKE_DIR } from "../../config/constants.js";
 import path from "path";
@@ -39,7 +39,7 @@ export async function handleAutoMemoryStatus(
     const decisions = decisionStore.listDecisions(10);
 
     if (decisions.length === 0) {
-      return text(
+      return formatChatResult(
         "[AUTO-MEMORY] No decisions recorded yet.\n\n" +
           "Decisions are recorded automatically when you make a firm choice or agreement.\n" +
           'Try: "I\'ll use TypeScript for this project" or "Let\'s go with option A"',
@@ -52,7 +52,7 @@ export async function handleAutoMemoryStatus(
       return `${i + 1}. ${d.text}${rationale}\n   ${fmtDate(d.timestamp)}${ep}`;
     });
 
-    return text(
+    return formatChatResult(
       `[AUTO-MEMORY] Last ${decisions.length} auto-recorded decision(s):\n` +
         "─".repeat(50) +
         "\n" +
@@ -66,7 +66,7 @@ export async function handleAutoMemoryStatus(
     const active = episodeStore.getActiveEpisode();
 
     if (episodes.length === 0) {
-      return text(
+      return formatChatResult(
         "[AUTO-MEMORY] No episodes recorded yet.\n\n" +
           "Episodes are started automatically when you begin working on a substantial topic.\n" +
           'Try: "Let\'s design the authentication system" or "Help me plan this project"',
@@ -84,7 +84,7 @@ export async function handleAutoMemoryStatus(
       return `• [${ep.id.slice(0, 8)}] "${ep.title}"\n  ${status} · ${fmtDate(ep.start)} · ${duration}${summary}`;
     });
 
-    return text(
+    return formatChatResult(
       `[AUTO-MEMORY] Episodes (${active ? "1 active" : "none active"}):\n` +
         "─".repeat(50) +
         "\n" +
@@ -97,7 +97,7 @@ export async function handleAutoMemoryStatus(
     const vectorFile = path.join(CAKE_DIR, "memory", "vectors.json");
     try {
       if (!fs.existsSync(vectorFile)) {
-        return text("[AUTO-MEMORY] No facts indexed yet.");
+        return formatChatResult("[AUTO-MEMORY] No facts indexed yet.");
       }
       const entries = JSON.parse(fs.readFileSync(vectorFile, "utf-8"));
       const autoExtracted = entries.filter(
@@ -105,7 +105,7 @@ export async function handleAutoMemoryStatus(
       );
 
       if (autoExtracted.length === 0) {
-        return text(
+        return formatChatResult(
           "[AUTO-MEMORY] No facts auto-extracted yet.\n\n" +
             "Facts are indexed automatically from important information you share.",
         );
@@ -120,14 +120,14 @@ export async function handleAutoMemoryStatus(
         return `${i + 1}. [${type}]${conf} ${e.text.slice(0, 100)}`;
       });
 
-      return text(
+      return formatChatResult(
         `[AUTO-MEMORY] ${autoExtracted.length} auto-extracted fact(s) — showing last 10:\n` +
           "─".repeat(50) +
           "\n" +
           rows.join("\n"),
       );
     } catch {
-      return text("[AUTO-MEMORY] Could not read memory store.");
+      return formatChatResult("[AUTO-MEMORY] Could not read memory store.");
     }
   }
 
@@ -149,7 +149,7 @@ export async function handleAutoMemoryStatus(
     }
   } catch {}
 
-  return text(
+  return formatChatResult(
     [
       "[AUTO-MEMORY] Status — everything runs automatically",
       "─".repeat(50),

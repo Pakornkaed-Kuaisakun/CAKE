@@ -1,9 +1,8 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { executeHybridAutonomous } from "../autonomous/index.js";
 import { AGENT_TOOLS } from "../autonomous/toolRegistry.js";
-import { text } from "../utils/text.js";
 import type { RunOptions } from "../index.js";
-import { stripVerb } from "../../shared/utils/utils.js";
+import { stripVerb, formatChatResult } from "../../shared/utils/utils.js";
 
 /**
  * Strips the trigger prefix from the user input to extract the bare goal.
@@ -67,7 +66,6 @@ function formatStep(step: {
   return lines.join("\n");
 }
 
-
 export async function handleAutonomous(
   provider: AIProvider,
   input: string,
@@ -79,7 +77,7 @@ export async function handleAutonomous(
     const toolNames = AGENT_TOOLS.map(
       (t) => `  • ${t.name} — ${t.description}`,
     ).join("\n");
-    return text(
+    return formatChatResult(
       `[AGENT] Usage: auto <goal>\n\nExample:\n  auto Research the top 3 Node.js HTTP frameworks and save a comparison to md\n\nAvailable tools:\n${toolNames}`,
     );
   }
@@ -97,12 +95,12 @@ export async function handleAutonomous(
 
   const stepLines: string[] = [];
 
-    const result = await executeHybridAutonomous(provider, goal, {
-      maxSteps: 10,
-      model,
-      signal: options?.signal,
-      recentResults: options?.recentResults,
-      onStep: (step) => {
+  const result = await executeHybridAutonomous(provider, goal, {
+    maxSteps: 10,
+    model,
+    signal: options?.signal,
+    recentResults: options?.recentResults,
+    onStep: (step) => {
       const line = formatStep(step);
       stepLines.push(line);
 
@@ -146,5 +144,5 @@ export async function handleAutonomous(
       : `⚠️  Stopped after ${result.stepsUsed} steps.\n\n${result.finalAnswer}`,
   ].join("\n");
 
-  return text(body);
+  return formatChatResult(body);
 }

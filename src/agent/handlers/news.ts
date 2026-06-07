@@ -5,7 +5,7 @@ import {
   buildDigest,
   extractTopic,
 } from "../../modules/news/index.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 import { getFastModel } from "../../providers/utils.js";
 
 export async function handleNews(
@@ -23,7 +23,7 @@ export async function handleNews(
   const articles = await fetchFeeds(maxPerFeed, topicLabel);
 
   if (articles.length === 0) {
-    return text(
+    return formatChatResult(
       `I couldn't find any recent news${topic ? ` about "${topicLabel}"` : ""}. Try a different topic?`,
     );
   }
@@ -32,20 +32,29 @@ export async function handleNews(
   const sliced = articles.slice(0, 10);
   let items: import("../../modules/news/summarize.js").NewsItem[] = [];
 
-  if (provider.name === "claude" && typeof (provider as any).runBatch === "function") {
+  if (
+    provider.name === "claude" &&
+    typeof (provider as any).runBatch === "function"
+  ) {
     const batchRequests = sliced.map((a, i) => ({
       customId: `article-${i}`,
-      messages: [{
-        role: "user" as const,
-        content: `Summarize this news article in 1-2 sentences:\n\nTitle: ${a.title}\n\n${a.content.slice(0, 1500)}`
-      }],
-      options: { model }
+      messages: [
+        {
+          role: "user" as const,
+          content: `Summarize this news article in 1-2 sentences:\n\nTitle: ${a.title}\n\n${a.content.slice(0, 1500)}`,
+        },
+      ],
+      options: { model },
     }));
 
     try {
-      const batchResults = await (provider as any).runBatch(batchRequests, { intervalMs: 2000 });
+      const batchResults = await (provider as any).runBatch(batchRequests, {
+        intervalMs: 2000,
+      });
       items = sliced.map((a, i) => {
-        const res = batchResults.find((r: any) => r.customId === `article-${i}`);
+        const res = batchResults.find(
+          (r: any) => r.customId === `article-${i}`,
+        );
         return {
           title: a.title,
           source: a.source,
@@ -71,5 +80,5 @@ export async function handleNews(
   const title = topic
     ? `[NEWS] ${topic.toUpperCase()} Digest`
     : "[NEWS] General Digest";
-  return text(`${title}\n\n${digest}\n\nSources:\n${list}`);
+  return formatChatResult(`${title}\n\n${digest}\n\nSources:\n${list}`);
 }

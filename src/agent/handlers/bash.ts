@@ -2,8 +2,7 @@
 import { exec } from "child_process";
 import { promisify } from "util";
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
-import { stripVerb } from "../../shared/utils/utils.js";
+import { stripVerb, formatChatResult } from "../../shared/utils/utils.js";
 import {
   guardOperation,
   classifyBashCommand,
@@ -76,14 +75,14 @@ export async function handleBash(
 ): Promise<ChatResult> {
   const cmd = extractBashCommand(input);
   if (!cmd) {
-    return text(
+    return formatChatResult(
       "Usage: bash <command>\nExamples:\n bash ls -la\n bash echo hello\n $ pwd",
     );
   }
 
   // Hard safety block — always denied regardless of permissions
   if (!isSafe(cmd)) {
-    return text(
+    return formatChatResult(
       `⛔ Command blocked for safety reasons: "${cmd}"\nDestructive system-level commands are not allowed.`,
     );
   }
@@ -108,7 +107,7 @@ export async function handleBash(
   const guard = await guardOperation(req, ask);
 
   if (!guard.allowed) {
-    return text(`🚫 ${guard.reason ?? "Permission denied."}`);
+    return formatChatResult(`🚫 ${guard.reason ?? "Permission denied."}`);
   }
 
   // ── Execute ─────────────────────────────────────────────────────────────────
@@ -133,7 +132,7 @@ export async function handleBash(
         ? lines.slice(0, 200).join("\n") +
           `\n… (${lines.length - 200} more lines)`
         : trimmed;
-    return text(
+    return formatChatResult(
       `[BASH] $ ${cmd}\n${"─".repeat(40)}\n${preview || "(no output)"}`,
     );
   } catch (err: any) {
@@ -146,6 +145,6 @@ export async function handleBash(
     if (stderr) parts.push(`stderr:\n${stderr}`);
     if (!stdout && !stderr) parts.push(err.message ?? "Unknown error");
 
-    return text(parts.join("\n"));
+    return formatChatResult(parts.join("\n"));
   }
 }

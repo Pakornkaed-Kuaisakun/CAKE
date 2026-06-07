@@ -1,7 +1,6 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { searchAndAnswer } from "../../modules/search/index.js";
-import { text } from "../utils/text.js";
-import { stripVerb } from "../../shared/utils/utils.js";
+import { stripVerb, formatChatResult } from "../../shared/utils/utils.js";
 
 export async function handleSearch(
   provider: AIProvider,
@@ -19,5 +18,5 @@ export async function handleSearch(
     "google",
   ]);
   const result = await searchAndAnswer(provider, query, model);
-  return text(`[SEARCH] ${result}`);
+  return formatChatResult(`[SEARCH] ${result}`);
 }

@@ -9,8 +9,7 @@ import {
   composeFile,
   findFiles,
 } from "../../modules/files/index.js";
-import { text } from "../utils/text.js";
-import { formatSize } from "../../shared/utils/utils.js";
+import { formatSize, formatChatResult } from "../../shared/utils/utils.js";
 import {
   guardOperation,
   type PermissionRequest,
@@ -59,7 +58,9 @@ export async function handleFileList(
   const match = input.match(/(?:ls|list)\s+(?:files?\s+in|directory)?\s*(.+)/i);
   const dir = match?.[1]?.trim() ?? ".";
   const files = listDirectory(dir);
-  return text(`[FILES] ${dir}:\n${files.map((f) => `  ${f}`).join("\n")}`);
+  return formatChatResult(
+    `[FILES] ${dir}:\n${files.map((f) => `  ${f}`).join("\n")}`,
+  );
 }
 
 export async function handleDirectoryTree(
@@ -71,9 +72,11 @@ export async function handleDirectoryTree(
   const dir = match?.[1]?.trim() || ".";
   try {
     const tree = createDirectoryTree(dir, { showSize: true, maxDepth: 5 });
-    return text(`[FILES] ${dir}\n\n${tree}`);
+    return formatChatResult(`[FILES] ${dir}\n\n${tree}`);
   } catch (err: any) {
-    return text(`Failed to read directory "${dir}"\n${err.message}`);
+    return formatChatResult(
+      `Failed to read directory "${dir}"\n${err.message}`,
+    );
   }
 }
 
@@ -84,9 +87,9 @@ export async function handleFileRead(
 ): Promise<ChatResult> {
   const match = input.match(/(?:read|show|open|cat)\s+(?:file\s+)?(.+)/i);
   const filePath = match?.[1]?.trim();
-  if (!filePath) return text("Please specify a file path.");
+  if (!filePath) return formatChatResult("Please specify a file path.");
   const content = await readFile(filePath);
-  return text(
+  return formatChatResult(
     `[FILES] ${filePath}\n${"─".repeat(40)}\n${content.slice(0, 3000)}`,
   );
 }
@@ -98,9 +101,9 @@ export async function handleFileSummarize(
 ): Promise<ChatResult> {
   const match = input.match(/(?:summarize)\s+(?:file\s+)?(.+)/i);
   const filePath = match?.[1]?.trim();
-  if (!filePath) return text("Please specify a file path.");
+  if (!filePath) return formatChatResult("Please specify a file path.");
   const summary = await summarizeFile(provider, filePath, model);
-  return text(`[FILES] Summary of ${filePath}\n\n${summary}`);
+  return formatChatResult(`[FILES] Summary of ${filePath}\n\n${summary}`);
 }
 
 export async function handleFindFile(
@@ -114,13 +117,16 @@ export async function handleFindFile(
   const query = match?.[1]?.trim();
   const root = match?.[2]?.trim();
 
-  if (!query) return text("Please specify a filename or query to find.");
+  if (!query)
+    return formatChatResult("Please specify a filename or query to find.");
 
   const results = await findFiles(query, { root });
 
   if (results.length === 0) {
     const context = root ? ` in "${root}"` : "";
-    return text(`[FILES] No files found matching "${query}"${context}`);
+    return formatChatResult(
+      `[FILES] No files found matching "${query}"${context}`,
+    );
   }
 
   const list = results
@@ -132,7 +138,7 @@ export async function handleFindFile(
 
   const count = results.length;
   const unit = count === 1 ? "FILE" : "FILES";
-  return text(`[FOUND ${count} ${unit}]\n\n${list}`);
+  return formatChatResult(`[FOUND ${count} ${unit}]\n\n${list}`);
 }
 
 // ── Write handlers (permission required) ──────────────────────────────────────
@@ -145,7 +151,8 @@ export async function handleFileCompose(
   const match = input.match(
     /(?:compose|create|write)\s+file\s+(.+?)\s+(?:with|about|containing)\s+(.+)/i,
   );
-  if (!match) return text("Usage: compose file <path> with <description>");
+  if (!match)
+    return formatChatResult("Usage: compose file <path> with <description>");
 
   const filePath = match[1].trim();
   const description = match[2].trim();
@@ -162,11 +169,11 @@ export async function handleFileCompose(
   );
 
   if (!guard.allowed) {
-    return text(`🚫 ${guard.reason ?? "Permission denied."}`);
+    return formatChatResult(`🚫 ${guard.reason ?? "Permission denied."}`);
   }
 
   const content = await composeFile(provider, filePath, description, model);
-  return text(
+  return formatChatResult(
     `[FILES] Created ${filePath}\n${"─".repeat(40)}\n${content.slice(0, 1000)}`,
   );
 }

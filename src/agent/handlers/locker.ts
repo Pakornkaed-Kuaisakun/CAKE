@@ -21,7 +21,6 @@
 // This keeps ALL crypto inside the module layer and the handler stays thin.
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import {
   lockerAdd,
   lockerGet,
@@ -32,8 +31,12 @@ import {
   findEntryByLabel,
   lockerFilePath,
 } from "../../modules/locker/index.js";
-import { stripVerb, fmtDate, stripQuotes } from "../../shared/utils/utils.js";
-
+import {
+  stripVerb,
+  fmtDate,
+  stripQuotes,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 // ── Password sentinel ─────────────────────────────────────────────────────────
 // Injected into the re-call input when Ink has collected the password.
@@ -76,7 +79,7 @@ export async function handleLockerAdd(
   const label = stripQuotes(beforeVal.replace(/--category\s+\S+/i, ""));
 
   if (!label) {
-    return text(
+    return formatChatResult(
       "Usage: locker_add <label> [--category <category>]\n" +
         'Example: locker_add "GitHub PAT" --category api-keys',
     );
@@ -94,17 +97,19 @@ export async function handleLockerAdd(
 
   if (!value) {
     // Signal UI: need value input
-    return text(`${NEEDS_VALUE}:${label}${category ? `:${category}` : ""}`);
+    return formatChatResult(
+      `${NEEDS_VALUE}:${label}${category ? `:${category}` : ""}`,
+    );
   }
 
   if (!password) {
     // Signal UI: need password
-    return text(`${NEEDS_PASSWORD}:add`);
+    return formatChatResult(`${NEEDS_PASSWORD}:add`);
   }
 
   try {
     const id = lockerAdd(label, value, password, category);
-    return text(
+    return formatChatResult(
       `🔐 Secret stored successfully!\n` +
         `  Label    : ${label}\n` +
         `  ID       : ${id}\n` +
@@ -113,7 +118,7 @@ export async function handleLockerAdd(
         `Retrieve with: locker_get ${id}`,
     );
   } catch (err: any) {
-    return text(`❌ Failed to store secret: ${err.message}`);
+    return formatChatResult(`❌ Failed to store secret: ${err.message}`);
   }
 }
 
@@ -128,7 +133,7 @@ export async function handleLockerGet(
   const query = stripVerb(cleaned, ["locker_get", "locker get", "locker show"]);
 
   if (!query) {
-    return text(
+    return formatChatResult(
       "Usage: locker_get <id or label>\n" +
         "Run locker_list to see all stored keys.",
     );
@@ -137,18 +142,18 @@ export async function handleLockerGet(
   // Resolve ID
   const entry = findEntryByLabel(query);
   if (!entry) {
-    return text(
+    return formatChatResult(
       `❌ No entry found matching "${query}". Run locker_list to see all keys.`,
     );
   }
 
   if (!password) {
-    return text(`${NEEDS_PASSWORD}:get:${entry.id}:${entry.label}`);
+    return formatChatResult(`${NEEDS_PASSWORD}:get:${entry.id}:${entry.label}`);
   }
 
   try {
     const value = lockerGet(entry.id, password);
-    return text(
+    return formatChatResult(
       `🔓 Secret revealed:\n` +
         `  Label    : ${entry.label}\n` +
         (entry.category ? `  Category : ${entry.category}\n` : "") +
@@ -157,7 +162,7 @@ export async function handleLockerGet(
         `⚠️  This value is now visible. Clear your terminal history if sensitive.`,
     );
   } catch (err: any) {
-    return text(`❌ ${err.message}`);
+    return formatChatResult(`❌ ${err.message}`);
   }
 }
 
@@ -171,7 +176,7 @@ export async function handleLockerList(
   const entries = lockerList();
 
   if (entries.length === 0) {
-    return text(
+    return formatChatResult(
       "[LOCKER] No secrets stored yet.\n\n" +
         'Add one with: locker_add "My API Key" --category api-keys',
     );
@@ -186,7 +191,7 @@ export async function handleLockerList(
     );
   });
 
-  return text(
+  return formatChatResult(
     `[LOCKER] ${entries.length} secret${entries.length !== 1 ? "s" : ""} stored\n` +
       `File: ${lockerFilePath()}\n` +
       "─".repeat(50) +
@@ -210,18 +215,19 @@ export async function handleLockerDelete(
   ]);
 
   if (!query) {
-    return text("Usage: locker_delete <id or label>");
+    return formatChatResult("Usage: locker_delete <id or label>");
   }
 
   const entry = findEntryByLabel(query);
   if (!entry) {
-    return text(`❌ No entry found matching "${query}".`);
+    return formatChatResult(`❌ No entry found matching "${query}".`);
   }
 
   const deleted = lockerDelete(entry.id);
-  if (!deleted) return text(`❌ Could not delete entry "${query}".`);
+  if (!deleted)
+    return formatChatResult(`❌ Could not delete entry "${query}".`);
 
-  return text(
+  return formatChatResult(
     `🗑️  Deleted secret: "${entry.label}" (${entry.id.slice(0, 8)}…)`,
   );
 }
@@ -241,12 +247,12 @@ export async function handleLockerUpdate(
   const query = valIdx !== -1 ? queryRaw.slice(0, valIdx).trim() : queryRaw;
 
   if (!query) {
-    return text("Usage: locker_update <id or label>");
+    return formatChatResult("Usage: locker_update <id or label>");
   }
 
   const entry = findEntryByLabel(query);
   if (!entry) {
-    return text(`❌ No entry found matching "${query}".`);
+    return formatChatResult(`❌ No entry found matching "${query}".`);
   }
 
   // Need new value + password
@@ -260,18 +266,20 @@ export async function handleLockerUpdate(
   }
 
   if (!value) {
-    return text(`${NEEDS_VALUE}:update:${entry.id}:${entry.label}`);
+    return formatChatResult(`${NEEDS_VALUE}:update:${entry.id}:${entry.label}`);
   }
 
   if (!password) {
-    return text(`${NEEDS_PASSWORD}:update:${entry.id}:${entry.label}`);
+    return formatChatResult(
+      `${NEEDS_PASSWORD}:update:${entry.id}:${entry.label}`,
+    );
   }
 
   try {
     lockerUpdate(entry.id, value, password);
-    return text(`✅ Secret updated: "${entry.label}"`);
+    return formatChatResult(`✅ Secret updated: "${entry.label}"`);
   } catch (err: any) {
-    return text(`❌ ${err.message}`);
+    return formatChatResult(`❌ ${err.message}`);
   }
 }
 
@@ -284,14 +292,14 @@ export async function handleLockerClear(
 ): Promise<ChatResult> {
   // Require explicit --confirm flag to prevent accidents
   if (!input.includes("--confirm")) {
-    return text(
+    return formatChatResult(
       "⚠️  This will delete ALL stored secrets permanently.\n" +
         "To confirm, run: locker_clear --confirm",
     );
   }
 
   const count = lockerClear();
-  return text(
+  return formatChatResult(
     `🗑️  Cleared ${count} secret${count !== 1 ? "s" : ""} from the locker.`,
   );
 }
@@ -308,7 +316,7 @@ export async function handleLockerInfo(
     ...new Set(entries.map((e) => e.category).filter(Boolean)),
   ];
 
-  return text(
+  return formatChatResult(
     `[LOCKER] Secure Key Locker\n` +
       "─".repeat(40) +
       "\n" +

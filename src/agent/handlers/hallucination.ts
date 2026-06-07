@@ -13,7 +13,6 @@
 //   /hallucination info         — show config and file paths
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import {
   getStats,
   getRecentEvents,
@@ -21,6 +20,7 @@ import {
   logFilePath,
 } from "../../modules/hallucination/tracker.js";
 import type { HallucinationRisk } from "../../modules/hallucination/types.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 // ── Session config (not persisted — resets on restart) ────────────────────────
 
@@ -74,7 +74,7 @@ export async function handleHallucinationCommand(
   // ── /hallucination on ─────────────────────────────────────────────────────
   if (sub === "on") {
     hallucinationConfig.enabled = true;
-    return text(
+    return formatChatResult(
       "✅ Hallucination detection enabled. Risky responses will be hedged.",
     );
   }
@@ -82,7 +82,7 @@ export async function handleHallucinationCommand(
   // ── /hallucination off ────────────────────────────────────────────────────
   if (sub === "off") {
     hallucinationConfig.enabled = false;
-    return text(
+    return formatChatResult(
       "⏸️  Hallucination detection disabled for this session.\n   Run /hallucination on to re-enable.",
     );
   }
@@ -90,7 +90,7 @@ export async function handleHallucinationCommand(
   // ── /hallucination verbose ────────────────────────────────────────────────
   if (sub === "verbose") {
     hallucinationConfig.verbose = !hallucinationConfig.verbose;
-    return text(
+    return formatChatResult(
       hallucinationConfig.verbose
         ? "🔍 Verbose mode ON — individual suspect claims will be annotated with ⚠️"
         : "🔍 Verbose mode OFF",
@@ -101,7 +101,7 @@ export async function handleHallucinationCommand(
   if (sub === "threshold") {
     const raw = parseFloat(args[1] ?? "");
     if (isNaN(raw) || raw < 0 || raw > 1) {
-      return text(
+      return formatChatResult(
         `Current threshold: ${hallucinationConfig.threshold}\n` +
           `Usage: /hallucination threshold <0.0–1.0>\n` +
           `  0.0 = flag everything\n` +
@@ -111,13 +111,13 @@ export async function handleHallucinationCommand(
       );
     }
     hallucinationConfig.threshold = raw;
-    return text(`✅ Threshold set to ${raw} (${fmtScore(raw)})`);
+    return formatChatResult(`✅ Threshold set to ${raw} (${fmtScore(raw)})`);
   }
 
   // ── /hallucination clear ──────────────────────────────────────────────────
   if (sub === "clear") {
     const count = clearLog();
-    return text(
+    return formatChatResult(
       `🗑️  Cleared ${count} event${count !== 1 ? "s" : ""} from the hallucination log.`,
     );
   }
@@ -128,7 +128,7 @@ export async function handleHallucinationCommand(
     const events = getRecentEvents(limit);
 
     if (events.length === 0) {
-      return text(
+      return formatChatResult(
         "[HALLUCINATION] No events logged yet.\nStart chatting and events will be recorded automatically.",
       );
     }
@@ -147,7 +147,7 @@ export async function handleHallucinationCommand(
         .join("\n");
     });
 
-    return text(
+    return formatChatResult(
       `[HALLUCINATION] Last ${events.length} event${events.length !== 1 ? "s" : ""}:\n` +
         "─".repeat(60) +
         "\n" +
@@ -157,7 +157,7 @@ export async function handleHallucinationCommand(
 
   // ── /hallucination info ───────────────────────────────────────────────────
   if (sub === "info") {
-    return text(
+    return formatChatResult(
       [
         "[HALLUCINATION PREVENTION] Configuration",
         "─".repeat(50),
@@ -187,7 +187,7 @@ export async function handleHallucinationCommand(
   const stats = getStats();
 
   if (stats.totalChecked === 0) {
-    return text(
+    return formatChatResult(
       [
         "[HALLUCINATION PREVENTION] No data yet",
         "",
@@ -222,7 +222,7 @@ export async function handleHallucinationCommand(
           .join("\n")
       : "  (none detected)";
 
-  return text(
+  return formatChatResult(
     [
       "[HALLUCINATION PREVENTION] Stats",
       "─".repeat(50),

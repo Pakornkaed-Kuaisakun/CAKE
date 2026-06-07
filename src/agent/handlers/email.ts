@@ -7,9 +7,11 @@ import {
   sendEmail,
   parseEmailCommand,
 } from "../../modules/email/index.js";
-import { text } from "../utils/text.js";
-import { parseJsonMarkdown, stripQuotes } from "../../shared/utils/utils.js";
-
+import {
+  parseJsonMarkdown,
+  stripQuotes,
+  formatChatResult,
+} from "../../shared/utils/utils.js";
 
 export async function handleEmail(
   provider: AIProvider,
@@ -24,7 +26,7 @@ export async function handleEmail(
         `  • ${e.subject}\n    From: ${e.from}\n    Date: ${new Date(e.date).toLocaleString()}\n      Summary: ${e.summary}\n    `,
     )
     .join("\n\n");
-  return text(`[EMAIL] Emails:\n${out}`);
+  return formatChatResult(`[EMAIL] Emails:\n${out}`);
 }
 
 export async function handleSendEmail(
@@ -78,7 +80,7 @@ export async function handleSendEmail(
       }
     } catch (e) {
       if (!parsed) {
-        return text(
+        return formatChatResult(
           "Could not parse email details. Please use format: email_send to <email> subject <subject> body <body>",
         );
       }
@@ -116,7 +118,7 @@ export async function handleSendEmail(
     !parsed?.subject ||
     (!parsed?.body && !parsed?.attachment)
   ) {
-    return text(`Missing email details. 
+    return formatChatResult(`Missing email details. 
     To: ${parsed?.to || "???"}
     Subject: ${parsed?.subject || "???"}
     Body: ${parsed?.body || "???"}
@@ -140,8 +142,10 @@ export async function handleSendEmail(
       attachments,
     });
 
-    return text(`[EMAIL] Sent successfully! Message ID: ${messageId}`);
+    return formatChatResult(
+      `[EMAIL] Sent successfully! Message ID: ${messageId}`,
+    );
   } catch (error: any) {
-    return text(`[EMAIL] Failed to send email: ${error.message}`);
+    return formatChatResult(`[EMAIL] Failed to send email: ${error.message}`);
   }
 }

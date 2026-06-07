@@ -1,19 +1,23 @@
 import { AIProvider, ChatResult } from "../../providers/types.js";
 import { scanDirectory } from "../../modules/security/index.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 export async function handleSecurityScan(
   _provider: AIProvider,
   input: string,
   _model?: string,
 ): Promise<ChatResult> {
-  const match = input.match(/(?:scan|security\s+scan)(?:\s+(?:for|in))?\s*(.+)?/i);
+  const match = input.match(
+    /(?:scan|security\s+scan)(?:\s+(?:for|in))?\s*(.+)?/i,
+  );
   const dir = match?.[1]?.trim() || ".";
 
   const results = await scanDirectory(dir);
 
   if (results.length === 0) {
-    return text(`[SECURITY] Scan complete. No threats found in "${dir}".`);
+    return formatChatResult(
+      `[SECURITY] Scan complete. No threats found in "${dir}".`,
+    );
   }
 
   const report = results
@@ -25,7 +29,7 @@ export async function handleSecurityScan(
     })
     .join("\n\n");
 
-  return text(
+  return formatChatResult(
     `[SECURITY] Scan complete. Found ${results.length} suspicious files in "${dir}":\n\n${report}`,
   );
 }

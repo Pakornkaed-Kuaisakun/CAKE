@@ -1,7 +1,6 @@
+import { ChatResult } from "../../providers/types.js";
+
 // Verb-stripping
-
-import { ExecutionState } from "../../agent/autonomous/executionState.js";
-
 /**
  * Remove one of the provided verb prefixes from raw user input.
  *
@@ -138,4 +137,8 @@ export function parseJsonMarkdown(text: string): any {
   let cleaned = text.replace(/```json|```/g, "").trim();
   cleaned = cleaned.replace(/\/\/.*/gm, ""); // strip comments
   return JSON.parse(cleaned);
+}
+
+export function formatChatResult(t: string): ChatResult {
+  return { text: t };
 }

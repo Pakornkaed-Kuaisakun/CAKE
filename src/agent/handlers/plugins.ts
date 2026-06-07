@@ -4,7 +4,7 @@
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
 import { getPlugins, isInitialized, PLUGINS_DIR } from "../plugins/index.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 export async function handlePlugins(
   _provider: AIProvider,
@@ -12,13 +12,13 @@ export async function handlePlugins(
   _model?: string,
 ): Promise<ChatResult> {
   if (!isInitialized()) {
-    return text("[PLUGINS] Plugin system not yet initialized.");
+    return formatChatResult("[PLUGINS] Plugin system not yet initialized.");
   }
 
   const plugins = getPlugins();
 
   if (plugins.length === 0) {
-    return text(
+    return formatChatResult(
       [
         `[PLUGINS] No plugins loaded.`,
         ``,
@@ -51,7 +51,7 @@ export async function handlePlugins(
     ].join("\n");
   });
 
-  return text(
+  return formatChatResult(
     [
       `[PLUGINS] ${plugins.length} plugin${plugins.length !== 1 ? "s" : ""} loaded`,
       `Plugin directory: ${PLUGINS_DIR}`,

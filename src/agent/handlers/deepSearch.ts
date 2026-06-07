@@ -16,10 +16,13 @@
 // The handler streams real-time progress lines and returns a full report.
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import { deepSearch } from "../../modules/deepSearch/index.js";
-import { getDeepSearchRun, listDeepSearchRuns } from "../../modules/deepSearch/monitor.js";
+import {
+  getDeepSearchRun,
+  listDeepSearchRuns,
+} from "../../modules/deepSearch/monitor.js";
 import type { RunOptions } from "../index.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 
 /** Strip the intent verb prefix from the input */
 function extractTopic(input: string): string {
@@ -48,7 +51,7 @@ export async function handleDeepSearch(
   const autoExport = wantsExport(input);
 
   if (!topic) {
-    return text(
+    return formatChatResult(
       [
         "Usage: deep search <topic>",
         "",
@@ -128,7 +131,7 @@ export async function handleDeepSearch(
     if (exportNote) options.onChunk(exportNote);
   }
 
-  return text(body);
+  return formatChatResult(body);
 }
 
 export async function handleDeepSearchList(
@@ -136,26 +139,33 @@ export async function handleDeepSearchList(
   _input: string,
 ): Promise<ChatResult> {
   const runs = listDeepSearchRuns();
-  if (runs.length === 0) return text("No active deep search runs.");
+  if (runs.length === 0) return formatChatResult("No active deep search runs.");
 
   const lines = runs.map((run) => {
-    const age = run.startedAt ? `started ${new Date(run.startedAt).toISOString()}` : "not started";
+    const age = run.startedAt
+      ? `started ${new Date(run.startedAt).toISOString()}`
+      : "not started";
     return `${run.id} | ${run.status} | ${run.topic} | ${run.currentPhase} | ${run.progressPct}% | ${age}`;
   });
 
-  return text(lines.join("\n"));
+  return formatChatResult(lines.join("\n"));
 }
 
 export async function handleDeepSearchStatus(
   _provider: AIProvider,
   input: string,
 ): Promise<ChatResult> {
-  const match = input.match(/^(?:deep[_\s]?search[_\s]?status|deep search status)\s+(\S+)$/i);
-  if (!match) return text("Usage: deep_search_status <runId> or deep search status <runId>");
+  const match = input.match(
+    /^(?:deep[_\s]?search[_\s]?status|deep search status)\s+(\S+)$/i,
+  );
+  if (!match)
+    return formatChatResult(
+      "Usage: deep_search_status <runId> or deep search status <runId>",
+    );
 
   const runId = match[1];
   const run = getDeepSearchRun(runId);
-  if (!run) return text(`Deep search run not found: ${runId}`);
+  if (!run) return formatChatResult(`Deep search run not found: ${runId}`);
 
   const lines = [
     `Run ID: ${run.id}`,
@@ -169,13 +179,14 @@ export async function handleDeepSearchStatus(
     run.error ? `Error: ${run.error}` : null,
     "",
     "Timeline:",
-    ...run.timeline.map((entry) =>
-      `  [${entry.status}] ${entry.phase} - ${entry.name} ${entry.progressPct ? `(${entry.progressPct}%)` : ""}` +
-      `${entry.startedAt ? ` started=${entry.startedAt}` : ""}` +
-      `${entry.completedAt ? ` completed=${entry.completedAt}` : ""}` +
-      `${entry.details ? ` details=${entry.details}` : ""}`,
+    ...run.timeline.map(
+      (entry) =>
+        `  [${entry.status}] ${entry.phase} - ${entry.name} ${entry.progressPct ? `(${entry.progressPct}%)` : ""}` +
+        `${entry.startedAt ? ` started=${entry.startedAt}` : ""}` +
+        `${entry.completedAt ? ` completed=${entry.completedAt}` : ""}` +
+        `${entry.details ? ` details=${entry.details}` : ""}`,
     ),
   ].filter(Boolean) as string[];
 
-  return text(lines.join("\n"));
+  return formatChatResult(lines.join("\n"));
 }

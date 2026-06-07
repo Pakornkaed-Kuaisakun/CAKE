@@ -1,5 +1,5 @@
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
+import { formatChatResult } from "../../shared/utils/utils.js";
 import { getWeatherReport } from "../../modules/weather/index.js";
 
 export async function handleWeather(
@@ -8,5 +8,5 @@ export async function handleWeather(
   _model?: string,
 ): Promise<ChatResult> {
   const report = await getWeatherReport();
-  return text(report);
+  return formatChatResult(report);
 }

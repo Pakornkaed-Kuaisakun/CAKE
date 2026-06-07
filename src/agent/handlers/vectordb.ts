@@ -16,7 +16,6 @@
 // All intents are also reachable via natural-language routing through AiRouter.
 
 import type { AIProvider, ChatResult } from "../../providers/types.js";
-import { text } from "../utils/text.js";
 import {
   ingestText,
   ingestFile,
@@ -34,6 +33,7 @@ import {
   stripVerb,
   splitCollectionPayload,
   formatScore,
+  formatChatResult,
 } from "../../shared/utils/utils.js";
 
 // ── vdb_query ─────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ export async function handleVdbQuery(
   }
 
   if (!raw) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_query [collection] <question>\n" +
         "Example: vdb_query diseases What are the symptoms of malaria?\n" +
         "         vdb_query What is dengue fever?",
@@ -104,7 +104,7 @@ export async function handleVdbQuery(
           .join("\n")
       : "";
 
-  return text(
+  return formatChatResult(
     `[VDB] ${searchType} search in ${scope}\n` +
       "─".repeat(50) +
       "\n" +
@@ -124,26 +124,31 @@ export async function handleVdbAdd(
   const { collection, payload } = splitCollectionPayload(raw);
 
   if (!collection || !payload) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_add <collection> <text>\n" +
         'Example: vdb_add diseases "Malaria is caused by Plasmodium parasites…"',
     );
   }
 
   if (!/^[a-zA-Z0-9_-]+$/.test(collection)) {
-    return text(
+    return formatChatResult(
       `[VDB] Invalid collection name "${collection}". ` +
         `Collection names must contain only letters, numbers, underscores, and hyphens.\n` +
         `Did you mean: vdb_add <collection> <text>?`,
     );
   }
 
-  const { id, usedEmbedding } = await ingestText(provider, collection, payload);
+  const { id, usedEmbedding } = await ingestText(
+    provider,
+    collection,
+    payload,
+    { model },
+  );
   const embeddingNote = usedEmbedding
     ? "embedded ✓"
     : "stored (no embedding — keyword-only)";
 
-  return text(
+  return formatChatResult(
     `[VDB] Added to "${collection}"\n` +
       `  ID        : ${id}\n` +
       `  Embedding : ${embeddingNote}\n` +
@@ -167,7 +172,7 @@ export async function handleVdbIngest(
   const { collection, payload: filePath } = splitCollectionPayload(raw);
 
   if (!collection || !filePath) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_ingest <collection> <file_path>\n" +
         "Example: vdb_ingest diseases /data/medical-reference.pdf\n" +
         "Supported: .pdf .docx .txt .md",
@@ -184,14 +189,14 @@ export async function handleVdbIngest(
       ? "semantic embeddings ✓"
       : "keyword-only (switch to openai or ollama for embeddings)";
 
-    return text(
+    return formatChatResult(
       `[VDB] Ingested file into "${collection}"\n` +
         `  File      : ${filePath}\n` +
         `  Chunks    : ${chunks}\n` +
         `  Embedding : ${embeddingNote}`,
     );
   } catch (err: any) {
-    return text(`[VDB] Failed to ingest file.\n${err.message}`);
+    return formatChatResult(`[VDB] Failed to ingest file.\n${err.message}`);
   }
 }
 
@@ -206,14 +211,14 @@ export async function handleVdbCreate(
   const { collection, payload: description } = splitCollectionPayload(raw);
 
   if (!collection) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_create <collection> [description]\n" +
         "Example: vdb_create diseases Medical disease reference database",
     );
   }
 
   const col = createCollection(collection, description || "");
-  return text(
+  return formatChatResult(
     `[VDB] Collection created\n` +
       `  Name        : ${col.name}\n` +
       `  Description : ${col.description || "(none)"}\n` +
@@ -236,12 +241,12 @@ export async function handleVdbList(
     const { collection } = splitCollectionPayload(raw);
 
     if (!collectionExists(collection)) {
-      return text(`[VDB] Collection "${collection}" not found.`);
+      return formatChatResult(`[VDB] Collection "${collection}" not found.`);
     }
 
     const docs = listDocuments(collection, 20);
     if (docs.length === 0) {
-      return text(
+      return formatChatResult(
         `[VDB] Collection "${collection}" is empty.\n` +
           `Add data with: vdb_add ${collection} <text>`,
       );
@@ -259,7 +264,7 @@ export async function handleVdbList(
       );
     });
 
-    return text(
+    return formatChatResult(
       `[VDB] "${collection}" — ${docs.length} document(s)\n` +
         "─".repeat(50) +
         "\n" +
@@ -271,7 +276,7 @@ export async function handleVdbList(
   // List all collections
   const collections = listCollections();
   if (collections.length === 0) {
-    return text(
+    return formatChatResult(
       "[VDB] No collections yet.\n\n" +
         "Create one with: vdb_create <name> [description]\n" +
         "Or add directly: vdb_add <collection> <text>",
@@ -284,7 +289,7 @@ export async function handleVdbList(
       (c.description ? `\n       ${c.description}` : ""),
   );
 
-  return text(
+  return formatChatResult(
     `[VDB] ${collections.length} collection(s) — ${VECTORDB_DIR}\n` +
       "─".repeat(50) +
       "\n" +
@@ -304,7 +309,7 @@ export async function handleVdbDelete(
   const parts = raw.split(/\s+/);
 
   if (parts.length < 2) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_delete <collection> <doc_id>\n" +
         "Tip: Use vdb_list <collection> to see document IDs",
     );
@@ -314,12 +319,12 @@ export async function handleVdbDelete(
   const success = deleteDocument(collection, docId);
 
   if (!success) {
-    return text(
+    return formatChatResult(
       `[VDB] Document not found.\n  Collection: ${collection}\n  ID: ${docId}`,
     );
   }
 
-  return text(
+  return formatChatResult(
     `[VDB] ✅ Deleted document\n  Collection: ${collection}\n  ID: ${docId}`,
   );
 }
@@ -335,7 +340,7 @@ export async function handleVdbDrop(
   const { collection } = splitCollectionPayload(raw);
 
   if (!collection) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_drop <collection>\n" +
         "⚠️  This deletes the entire collection and all its documents.",
     );
@@ -343,10 +348,10 @@ export async function handleVdbDrop(
 
   const success = deleteCollection(collection);
   if (!success) {
-    return text(`[VDB] Collection "${collection}" not found.`);
+    return formatChatResult(`[VDB] Collection "${collection}" not found.`);
   }
 
-  return text(
+  return formatChatResult(
     `[VDB] ✅ Dropped collection "${collection}" (all data deleted).`,
   );
 }
@@ -362,18 +367,18 @@ export async function handleVdbClear(
   const { collection } = splitCollectionPayload(raw);
 
   if (!collection) {
-    return text(
+    return formatChatResult(
       "Usage: vdb_clear <collection>\n" +
         "This removes all documents but keeps the collection.",
     );
   }
 
   if (!collectionExists(collection)) {
-    return text(`[VDB] Collection "${collection}" not found.`);
+    return formatChatResult(`[VDB] Collection "${collection}" not found.`);
   }
 
   const count = clearDocuments(collection);
-  return text(
+  return formatChatResult(
     `[VDB] ✅ Cleared "${collection}" — removed ${count} document(s).`,
   );
 }
@@ -389,11 +394,11 @@ export async function handleVdbInfo(
   const { collection } = splitCollectionPayload(raw);
 
   if (!collection) {
-    return text("Usage: vdb_info <collection>");
+    return formatChatResult("Usage: vdb_info <collection>");
   }
 
   if (!collectionExists(collection)) {
-    return text(`[VDB] Collection "${collection}" not found.`);
+    return formatChatResult(`[VDB] Collection "${collection}" not found.`);
   }
 
   const docs = listDocuments(collection, 3);
@@ -417,7 +422,7 @@ export async function handleVdbInfo(
           .join("\n")
       : "\n(empty)";
 
-  return text(
+  return formatChatResult(
     `[VDB] Collection: ${collection}\n` +
       "─".repeat(50) +
       "\n" +
