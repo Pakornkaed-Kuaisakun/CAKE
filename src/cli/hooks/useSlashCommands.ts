@@ -31,6 +31,8 @@ const API_KEY_MAP: Record<string, string> = {
   claude: "ANTHROPIC_API_KEY",
   openai: "OPENAI_API_KEY",
   gemini: "GEMINI_API_KEY",
+  openrouter: "OPENROUTER_API_KEY",
+  puter: "PUTER_API_KEY",
 };
 
 const HELP = [
@@ -259,7 +261,10 @@ export function useSlashCommands({
         case "provider": {
           const name = args[0] as ProviderName;
           if (!name) {
-            addMsg("system", "Usage: /provider <claude|openai|gemini|ollama>");
+            addMsg(
+              "system",
+              "Usage: /provider <claude|openai|gemini|ollama|openrouter|puter>",
+            );
             return true;
           }
           const keyName = API_KEY_MAP[name];

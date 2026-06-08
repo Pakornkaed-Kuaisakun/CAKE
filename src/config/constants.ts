@@ -3,6 +3,8 @@ import path from "path";
 import os from "os";
 
 export const APP_NAME = "CAKE";
+export const APP_DESCRIPTION = "A hyper-intelligent personal assistant.";
+export const APP_REPO = `github.com/Pakornkaed-Kuaisakun/${APP_NAME}`;
 
 export const CAKE_DIR = path.join(os.homedir(), `.${APP_NAME.toLowerCase()}`);
 export const TODO_FILE = path.join(CAKE_DIR, "todos.json");

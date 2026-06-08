@@ -143,6 +143,9 @@ const TOOL_PREFIXES = new Set([
   "tq_purge",
   "tq_stats",
   "tq_drain",
+  "plan_trip",
+  "trip_plan",
+  "เที่ยว",
 ]);
 
 // ── Regex-based tool signals (precise enough to override ambiguity) ────────
@@ -182,6 +185,10 @@ const TOOL_PATTERNS: RegExp[] = [
   /^(export|save|write|chat_export)\s+(txt|md|json|csv|html|text|markdown)\b/i,
   // Screenshot / vision
   /what'?s?\s+on\s+(my\s+)?screen/i,
+  // Trip plan
+  /\bวางแผน.*เที่ยว\b|\bแพลน.*ทริป\b/i,
+  /\bplan.*trip\b.*\bto\b/i,
+  /\btrip.*plan(?:ner|ning)?\b/i,
 ];
 
 // ── Conversational patterns that definitively mean chat ───────────────────

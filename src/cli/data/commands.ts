@@ -398,7 +398,7 @@ export const COMMANDS: CommandSuggestion[] = [
   {
     command: "/provider <name>",
     description: "Switch to a different LLM provider",
-    parameters: ["claude", "openai", "gemini", "ollama", "openrouter"],
+    parameters: ["claude", "openai", "gemini", "ollama", "openrouter", "puter"],
   },
   { command: "/model <name>", description: "Switch to a different model" },
   { command: "/prefs", description: "Show current session & default settings" },
@@ -530,4 +530,8 @@ export const COMMANDS: CommandSuggestion[] = [
   { command: "tq_stats", description: "Show queue statistics" },
   { command: "tq_drain", description: "Wait for all queued tasks to finish" },
   ...HALLUCINATION_COMMANDS,
+  {
+    command: "plan_trip <destination> [days] [budget] [interests]",
+    description: "plan trip — geocoding, POI, routes, budget, GeoJSON",
+  },
 ];

@@ -401,6 +401,17 @@ export const ROUTES: Route[] = [
     ],
     handler: H.handleDeepSearch,
   },
+
+  // Trip planner
+  {
+    patterns: [
+      /^(?:plan_trip|trip_plan|เที่ยว)\b/i,
+      /\bวางแผน(?:เที่ยว|ทริป)\b/i,
+      /\bplan\s+(?:a\s+)?trip\s+to\b/i,
+      /\btrip\s+planner?\b/i,
+    ],
+    handler: H.handleTripPlan,
+  },
 ];
 
 /**

@@ -5,6 +5,7 @@ import { OpenAIProvider } from "./openai.js";
 import { GeminiProvider } from "./gemini.js";
 import { OllamaProvider } from "./ollama.js";
 import { OpenRouterProvider } from "./openrouter.js";
+import { PuterProvider } from "./puter.js";
 
 export {
   ClaudeProvider,
@@ -12,6 +13,7 @@ export {
   GeminiProvider,
   OllamaProvider,
   OpenRouterProvider,
+  PuterProvider,
 };
 
 export type {
@@ -46,6 +48,8 @@ export function createProvider(name: ProviderName): AIProvider {
       return new OllamaProvider();
     case "openrouter":
       return new OpenRouterProvider();
+    case "puter":
+      return new PuterProvider();
     default:
       throw new Error(`Unknown provider: ${name}`);
   }

@@ -106,6 +106,7 @@ const VALID_INTENTS = new Set([
   "tq_purge",
   "tq_stats",
   "tq_drain",
+  "plan_trip",
 ]);
 
 function resolveIntent(raw: string): string {
@@ -127,7 +128,7 @@ vdb_clear|vdb_info|locker|locker_add|locker_get|locker_list|locker_delete|locker
 locker_clear|locker_info|mcp|mcp_list|mcp_connect|mcp_disconnect|mcp_add|mcp_remove|
 mcp_enable|mcp_disable|mcp_tools|mcp_call|mcp_resources|mcp_read|mcp_prompts|
 async|background|async_list|async_status|async_cancel|deep_search|deep_research|
-tq_add|tq_list|tq_status|tq_cancel|tq_pause|tq_resume|tq_retry|tq_priority|tq_purge|tq_stats|tq_drain
+tq_add|tq_list|tq_status|tq_cancel|tq_pause|tq_resume|tq_retry|tq_priority|tq_purge|tq_stats|tq_drain|plan_trip
 
 Rules: output name only. unknown→chat. file extension→file op. $TICKER→finance. bash/$ prefix→bash.
 Examples: "show calendar"→calendar_list, "AAPL stock"→finance, "run ls"→bash, "hi"→chat`;

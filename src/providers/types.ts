@@ -5,7 +5,8 @@ export type ProviderName =
   | "openai"
   | "gemini"
   | "ollama"
-  | "openrouter";
+  | "openrouter"
+  | "puter";
 
 export interface Message {
   role: "user" | "assistant" | "system";

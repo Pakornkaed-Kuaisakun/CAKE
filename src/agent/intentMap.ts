@@ -167,6 +167,11 @@ export const BASE_INTENT_MAP: Record<string, Handler> = {
   tq_purge: H.handleTqPurge,
   tq_stats: H.handleTqStats,
   tq_drain: H.handleTqDrain,
+
+  // ── Trip Plan ────────────────────────────────────────────────────────
+  plan_trip: H.handleTripPlan,
+  trip_plan: H.handleTripPlan,
+  เที่ยว: H.handleTripPlan,
 };
 
 /**

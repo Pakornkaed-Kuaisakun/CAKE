@@ -16,6 +16,8 @@ export function getFastModel(provider: ProviderName): string | undefined {
       return "qwen2.5:3b";
     case "openrouter":
       return "nvidia/nemotron-3-nano-30b-a3b:free";
+    case "puter":
+      return "claude-haiku-4-5";
     default:
       return undefined;
   }
@@ -37,6 +39,8 @@ export function getFullModel(provider: ProviderName): string | undefined {
       return "llama3:8b";
     case "openrouter":
       return "nvidia/nemotron-3-nano-30b-a3b:free";
+    case "puter":
+      return "claude-opus-4-8";
     default:
       return undefined;
   }

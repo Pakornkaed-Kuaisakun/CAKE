@@ -25,3 +25,4 @@ export * from "./locker.js";
 export * from "./mcp.js";
 export * from "./deepSearch.js";
 export * from "./taskQueue.js";
+export * from "./tripPlanner.js";
