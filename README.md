@@ -1,6 +1,30 @@
-# ⚡ CAKE — AI Unified Runtime Assistant v0.1.0
+# ⚡ CAKE — AI Unified Runtime Assistant v0.3.1
 
-Modular AI framework CLI + Discord bot. Supports Claude, OpenAI, Gemini, and local Ollama models.
+Modular AI framework with **CLI**, **Web UI**, and **Discord bot**. Supports Claude, OpenAI, Gemini, and local Ollama models.
+
+## 🎯 Interfaces
+
+| Interface | Technology | Command | Port |
+|-----------|-----------|---------|------|
+| **Web UI** | React + Vite (OpenWebUI-inspired) | `npm run dev:web` | 3000 |
+| **Terminal CLI** | React Ink | `npm run dev` | N/A |
+| **Discord Bot** | Discord.js | `npm run discord` | N/A |
+| **HTTP Server** | Node.js native | `npm run dev:server` | 8000 |
+
+### 🌐 Quick Start Web UI
+
+```bash
+# Run everything (recommended)
+npm run dev:all
+
+# Or run separately:
+npm run dev:server      # Backend on :8000
+npm run dev:web         # Frontend on :3000
+```
+
+Then open **http://localhost:3000** in your browser.
+
+See [QUICKSTART.md](./QUICKSTART.md) for detailed setup.
 
 ---
 

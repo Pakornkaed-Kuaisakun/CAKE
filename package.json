@@ -5,7 +5,10 @@
   "description": "",
   "scripts": {
     "dev": "tsx src/cli/index.tsx",
-    "build": "tsc -p tsconfig.json",
+    "dev:web": "cd web && npm run dev",
+    "dev:server": "tsx src/server/index.ts",
+    "dev:all": "concurrently \"npm run dev:server\" \"npm run dev:web\"",
+    "build": "tsc -p tsconfig.json && cd web && npm run build",
     "test": "tsx test/**/*.test.ts",
     "start": "node dist/cli/index.js",
     "discord": "tsx src/discord/index.ts",
@@ -64,6 +67,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.14",
     "@types/string-similarity": "^4.0.2",
+    "concurrently": "^8.2.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3"

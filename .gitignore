@@ -45,5 +45,4 @@ ggml-base.en.bin
 .prompt
 
 Microsoft/
-/test
-/test
+test/

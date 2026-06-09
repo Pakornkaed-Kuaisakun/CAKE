@@ -89,7 +89,9 @@ const server = http.createServer(async (req, res) => {
           });
 
           // Define callback to stream tokens back to client
+          let streamedAnyContent = false;
           const onChunk = (chunk: string) => {
+            streamedAnyContent = true;
             const data = {
               id: chatcmplId,
               object: "chat.completion.chunk",
@@ -107,7 +109,24 @@ const server = http.createServer(async (req, res) => {
           };
 
           try {
-            await agent.run(lastMsg.content, { onChunk });
+            const result = await agent.run(lastMsg.content, { onChunk });
+
+            if (!streamedAnyContent && result.text) {
+              const data = {
+                id: chatcmplId,
+                object: "chat.completion.chunk",
+                created,
+                model: "cake",
+                choices: [
+                  {
+                    delta: { content: result.text },
+                    index: 0,
+                    finish_reason: null,
+                  },
+                ],
+              };
+              res.write(`data: ${JSON.stringify(data)}\n\n`);
+            }
 
             // Send end block
             const endData = {
